@@ -21,9 +21,16 @@ class Settings:
 
     # simulation parameters
     SIMULATION_TIMESTEP_MS = 1
-    HARDWARE_UPDATE_TIMESTEP_MS = 100 * SIMULATION_TIMESTEP_MS
-    USE_NOISY_ALTITUDE = True
+    HARDWARE_UPDATE_TIMESTEP_MS = 10 * SIMULATION_TIMESTEP_MS
+    PRINT_UPDATE_TIMESTEP_MS = 1000 * SIMULATION_TIMESTEP_MS # frequency of printing to console
+    USE_NOISY_ALTITUDE = False
     ALTITUDE_NOISE_MAX_AMPLITUDE_M = 10
+    USE_HARDWARE_TARGET = False
+    SIMULATION_SW_TARGET_LAUNCH_TIME_MS = 1000
+
+    # communication over serial with FC
+    PACKET_HEADER = 0xFFFF0000  # 32-bit value
+    PACKET_TRAILER = 0x0000FFFF # 32-bit value
 
     # rocket parameters for simulation
     RKT_MASS_KG = 48
@@ -42,7 +49,8 @@ class FLIGHT_STATES(Enum):
     DROGUE_DESCENT = 3
     MAIN_DESCENT = 4
     LANDED = 5
-    ERROR = 404
+    ERROR = 9
+    LAUNCH_COMMAND_START_SIM = 88
 
 class Sim_DataPoint:
     def __init__(self, time, pos_x, pos_z, pos_z_noisy, vel_x, vel_z, acc_x, acc_z, flight_state):

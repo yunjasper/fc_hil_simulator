@@ -26,18 +26,18 @@ import utils
 # no wind to start
 
 # todo: add logging of all data for the simulation session
-SIM_ON_LAPTOP = True # use other code to mimic FC to debug simulator code
 
 # for now, hardcode the port. todo: make flexible 
-SERIAL_PORT = 'COM8'
-BAUD_RATE = 1152000
+SERIAL_PORT = 'COM7'
+BAUD_RATE = 115200
 SERIAL_PORT_TIMEOUT = 5 # seconds
 
 class Simulation:
     def __init__(self) -> None:
         self.time = 0
         self.launch_time = 0
-        self.flight_state = utils.FLIGHT_STATES.BOOST
+        self.launched = False
+        self.sim_flight_state = utils.FLIGHT_STATES.PAD
         
         # rocket states
         self.rkt_pos_x = 0
@@ -47,10 +47,10 @@ class Simulation:
         self.rkt_vel_z = 0
         self.rkt_acc_x = 0
         self.rkt_acc_z = 0
+        self.rkt_flight_state = utils.FLIGHT_STATES.PAD
 
         self.datalog = [] # list of utils.Sim_DataPoint objects
         
-    
     def set_timestep_ms(self, timestep_ms):
         self.timestep_ms = timestep_ms
     
@@ -65,12 +65,12 @@ class Simulation:
         # calculate forces in x and z directions based on the flight phase
         rocket_weight = utils.Settings.GRAVITY * (rkt.dry_mass_kg + rkt.get_engine_mass_kg((self.time - self.launch_time) / 1000))
 
-        if self.flight_state == utils.FLIGHT_STATES.PAD:
+        if self.sim_flight_state == utils.FLIGHT_STATES.PAD:
             # rocket is stationary on the launch rail, all forces are balanced --> zero acceleration
             force_x = 0
             force_z = 0
         
-        elif self.flight_state == utils.FLIGHT_STATES.BOOST:
+        elif self.sim_flight_state == utils.FLIGHT_STATES.BOOST:
             # get thrust at this time
             if (self.time - self.launch_time) / 1000 < rkt.tc_burn_time:
                 thrust = rkt.get_thrust_N((self.time - self.launch_time) / 1000)
@@ -81,17 +81,17 @@ class Simulation:
             force_x = np.cos(la_rad) * thrust
             force_z = np.sin(la_rad) * thrust - rocket_weight
         
-        elif self.flight_state == utils.FLIGHT_STATES.COAST:
+        elif self.sim_flight_state == utils.FLIGHT_STATES.COAST:
             force_x = 0
             force_z = -1 * rocket_weight
 
-        elif self.flight_state == utils.FLIGHT_STATES.DROGUE_DESCENT:
+        elif self.sim_flight_state == utils.FLIGHT_STATES.DROGUE_DESCENT:
             force_x = 0
             # account for drogue parachute drag, assume only in z direction for now
             force_drogue = rkt.drogue_drag_coeff * utils.Settings.AIR_MASS_DENSITY * (self.rkt_vel_z ** 2) * rkt.drogue_area_m2 / 2
             force_z = force_drogue - rocket_weight
         
-        elif self.flight_state == utils.FLIGHT_STATES.MAIN_DESCENT:
+        elif self.sim_flight_state == utils.FLIGHT_STATES.MAIN_DESCENT:
             force_x = 0
             # account for main parachute drag, assume only in z direction for now
             force_main = rkt.main_drag_coeff * utils.Settings.AIR_MASS_DENSITY * (self.rkt_vel_z ** 2) * rkt.main_area_m2 / 2
@@ -100,7 +100,7 @@ class Simulation:
             if self.rkt_pos_z <= utils.Settings.GROUND_ALTITUDE_M:
                 force_z = 0
         
-        elif self.flight_state == utils.FLIGHT_STATES.LANDED:
+        elif self.sim_flight_state == utils.FLIGHT_STATES.LANDED:
             # nothing to do
             force_x = 0
             force_z = 0
@@ -129,7 +129,7 @@ class Simulation:
 
     def log_data(self):
         dp = utils.Sim_DataPoint(self.time, self.rkt_pos_x, self.rkt_pos_z, self.rkt_pos_z_noisy, 
-                                 self.rkt_vel_x, self.rkt_vel_z, self.rkt_acc_x, self.rkt_acc_z, self.flight_state)
+                                 self.rkt_vel_x, self.rkt_vel_z, self.rkt_acc_x, self.rkt_acc_z, self.rkt_flight_state)
         self.datalog.append(dp)
         
     def plot_simulation_results(self):
@@ -205,15 +205,16 @@ def main():
     sim = Simulation()
     sim.set_timestep_ms(utils.Settings.SIMULATION_TIMESTEP_MS)
 
-    if SIM_ON_LAPTOP == False:
+    if utils.Settings.USE_HARDWARE_TARGET == True:
         ser = open_COM_port()
+        ser.reset_input_buffer()
     else:
         ser = None
 
-    hw = hardware_interface.Hardware_Interface(ser, sim.flight_state, use_hw_target=False)
+    hw = hardware_interface.Hardware_Interface(ser, sim.sim_flight_state, use_hw_target=utils.Settings.USE_HARDWARE_TARGET)
 
     # start simulation
-    while sim.flight_state != utils.FLIGHT_STATES.LANDED:
+    while sim.sim_flight_state != utils.FLIGHT_STATES.LANDED:
         start_time_ns = time.time_ns()
         
         sim.simulate_tick(rkt)
@@ -222,8 +223,27 @@ def main():
             # send data to controller
             hw.send(sim.datalog[-1])
             hw_flight_state = hw.read_hw_state()
-            sim.flight_state = hw_flight_state
-            print('t = %d ms\tpos z = %.3f m\tstate = %d' % (sim.time, sim.rkt_pos_z, sim.flight_state.value))
+            if hw_flight_state == utils.FLIGHT_STATES.LAUNCH_COMMAND_START_SIM and sim.launched == False:
+                sim.sim_flight_state = utils.FLIGHT_STATES.BOOST
+                sim.launch_time = sim.time
+                sim.launched = True
+
+            if utils.Settings.USE_HARDWARE_TARGET == False:
+                if sim.time > utils.Settings.SIMULATION_SW_TARGET_LAUNCH_TIME_MS and sim.launched == False:
+                    sim.sim_flight_state = utils.FLIGHT_STATES.BOOST
+                    sim.launch_time = sim.time
+                    sim.launched = True
+            
+            sim.rkt_flight_state = hw_flight_state
+            if (hw_flight_state == utils.FLIGHT_STATES.DROGUE_DESCENT 
+                    or hw_flight_state == utils.FLIGHT_STATES.MAIN_DESCENT 
+                    or hw_flight_state == utils.FLIGHT_STATES.LANDED):
+                sim.sim_flight_state = hw_flight_state  
+            
+        
+        if (sim.time % utils.Settings.PRINT_UPDATE_TIMESTEP_MS == 0):
+            print('t = %d ms\tpos z = %.3f m\tsim state = %d\trkt state = %d' % (sim.time, sim.rkt_pos_z, sim.sim_flight_state.value, sim.rkt_flight_state.value))
+
         # if hw_flight_state == utils.FLIGHT_STATES.BOOST and sim.flight_state == utils.FLIGHT_STATES.PAD:
         #     sim.launch_time = sim.time # needed because thrust curve time starts at zero
         sim.increment_tick()

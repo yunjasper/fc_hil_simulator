@@ -8,6 +8,7 @@ author: jasper yun
 
 import numpy as np
 from scipy import stats # for linear regression
+import struct
 import utils
 
 
@@ -17,7 +18,7 @@ class Flight_Computer:
         self.accY = 0
         self.accZ = 0
         self.altitude = 0
-        self.flight_state = utils.FLIGHT_STATES.BOOST # TODO: fix sim setup so that we can start from PAD
+        self.flight_state = utils.FLIGHT_STATES.PAD # TODO: fix sim setup so that we can start from PAD
         self.ground_altitude = utils.Settings.GROUND_ALTITUDE_M # cheating but whatever
 
         # variables for the ejection algorithm
@@ -36,16 +37,27 @@ class Flight_Computer:
 
     def parse_telemetry(self, telemetry):
         # expects telemetry in form of 'S,AccX,AccY,AccZ,Altitude,E\r\n'
-        if telemetry[0] != 'S' or telemetry[-3:] != 'E\r\n':
+        # if telemetry[0] != 'S' or telemetry[-3:] != 'E\r\n':
+        #     print('Error: FC Mock - could not parse telemetry')
+        # else:
+        #     # try to split the string
+        #     splitted = telemetry[2:-3].split(',')
+        #     self.accX = float(splitted[0])
+        #     self.accY = float(splitted[1])
+        #     self.accZ = float(splitted[2])
+        #     self.altitude = float(splitted[3])
+
+        #     self.update_altitude_array(self.altitude)
+
+        # for struct format:
+        header, accX, accZ, altitude, trailer = struct.unpack('LfffL', telemetry)
+        if header != utils.Settings.PACKET_HEADER or trailer != utils.Settings.PACKET_TRAILER:
             print('Error: FC Mock - could not parse telemetry')
         else:
-            # try to split the string
-            splitted = telemetry[2:-3].split(',')
-            self.accX = float(splitted[0])
-            self.accY = float(splitted[1])
-            self.accZ = float(splitted[2])
-            self.altitude = float(splitted[3])
-
+            self.accX = accX
+            self.accY = 0
+            self.accZ = accZ
+            self.altitude = altitude
             self.update_altitude_array(self.altitude)
     
     def get_control_response(self):
