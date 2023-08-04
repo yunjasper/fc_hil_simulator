@@ -22,8 +22,6 @@ class Rocket:
         self.main_drag_coeff = main_drag_coeff
         self.main_area_m2 = main_area_m2
         self.launch_angle_deg = launch_angle_deg
-    
-        # todo: account for propellant mass
 
     def assign_thrust_curve(self, file_rse) -> None:
         # accepts an rse file (RockSim) thrust curve

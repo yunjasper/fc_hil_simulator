@@ -42,6 +42,7 @@ class Simulation:
         # rocket states
         self.rkt_pos_x = 0
         self.rkt_pos_z = utils.Settings.GROUND_ALTITUDE_M
+        self.rkt_pos_z_noisy = utils.Settings.GROUND_ALTITUDE_M
         self.rkt_vel_x = 0
         self.rkt_vel_z = 0
         self.rkt_acc_x = 0
@@ -120,19 +121,20 @@ class Simulation:
         self.rkt_vel_z += self.rkt_acc_z * self.timestep_ms / 1000
         self.rkt_pos_x += self.rkt_vel_x * self.timestep_ms / 1000
         self.rkt_pos_z += self.rkt_vel_z * self.timestep_ms / 1000
+        self.rkt_pos_z_noisy = self.rkt_pos_z + (np.random.rand(1, 1)[0][0] - 0.5) * utils.Settings.ALTITUDE_NOISE_MAX_AMPLITUDE_M
 
         if self.time % 100 == 0:
             a = 1 # added code to enable faster debugging
             b = 2
 
     def log_data(self):
-        dp = utils.Sim_DataPoint(self.time, self.rkt_pos_x, self.rkt_pos_z, self.rkt_vel_x, self.rkt_vel_z,
-                        self.rkt_acc_x, self.rkt_acc_z, self.flight_state)
+        dp = utils.Sim_DataPoint(self.time, self.rkt_pos_x, self.rkt_pos_z, self.rkt_pos_z_noisy, 
+                                 self.rkt_vel_x, self.rkt_vel_z, self.rkt_acc_x, self.rkt_acc_z, self.flight_state)
         self.datalog.append(dp)
         
     def plot_simulation_results(self):
-        cols = ['time (ms)', 'position x (m)', 'position z (m)', 'velocity x (m/s)', 'velocity z (m/s)',
-                   'acceleration x (m/s2)', 'acceleration z (m/s2)', 'flight state']
+        cols = ['time (ms)', 'position x (m)', 'position z (m)', 'position z (noisy) (m)', 'velocity x (m/s)', 
+                'velocity z (m/s)', 'acceleration x (m/s2)', 'acceleration z (m/s2)', 'flight state']
         datatable = pd.DataFrame(columns=cols) # empty
         for idx in np.arange(len(self.datalog), step=1000):
             point = self.datalog[idx]
@@ -163,6 +165,7 @@ class Simulation:
         ax[2][0].set_ylabel('acceleration x (m/s2)')
         ax[2][0].set_xlabel('time (s)')
 
+        ax[0][1].plot(time_values_s, datatable['position z (noisy) (m)'])
         ax[0][1].plot(time_values_s, datatable['position z (m)'])
         for idx in state_change_indices:
             ax[0][1].axvline(time_values_s[idx], color='red')
@@ -200,7 +203,7 @@ def main():
     rkt.assign_thrust_curve(utils.Settings.RKT_THRUST_CURVE_FILE)
 
     sim = Simulation()
-    sim.set_timestep_ms(1)
+    sim.set_timestep_ms(utils.Settings.SIMULATION_TIMESTEP_MS)
 
     if SIM_ON_LAPTOP == False:
         ser = open_COM_port()
@@ -215,9 +218,9 @@ def main():
         
         sim.simulate_tick(rkt)
         sim.log_data()
-        # send data to controller
-        hw.send(sim.datalog[-1])
-        if (sim.time % 100 == 0):
+        if (sim.time % utils.Settings.HARDWARE_UPDATE_TIMESTEP_MS == 0):
+            # send data to controller
+            hw.send(sim.datalog[-1])
             hw_flight_state = hw.read_hw_state()
             sim.flight_state = hw_flight_state
             print('t = %d ms\tpos z = %.3f m\tstate = %d' % (sim.time, sim.rkt_pos_z, sim.flight_state.value))
