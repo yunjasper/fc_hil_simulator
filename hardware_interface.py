@@ -38,8 +38,8 @@ class Hardware_Interface:
         # convert altitude (position in z axis) to barometric pressure
         altitude = data.rkt_pos_z
         pressure = altitude2pressure(altitude)
-        # print data into string: S,AccX,0,AccZ,Pressure,E\r\n
-        data_string = 'S,%.3f,0.000,%.3f,%.3f,E\r\n' % (data.rkt_acc_x, data.rkt_acc_z, pressure)
+        # print data into string: S,AccX,0,AccZ,Altitude,E\r\n
+        data_string = 'S,%.8f,0.000,%.8f,%.8f,E\r\n' % (data.rkt_acc_x, data.rkt_acc_z, altitude)
         if self.use_target_hw:
             self.com_port.write(data_string)
         else:

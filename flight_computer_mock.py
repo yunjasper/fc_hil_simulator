@@ -16,14 +16,14 @@ class Flight_Computer:
         self.accX = 0
         self.accY = 0
         self.accZ = 0
-        self.pressure = 0
+        self.altitude = 0
         self.flight_state = utils.FLIGHT_STATES.BOOST # TODO: fix sim setup so that we can start from PAD
         self.ground_altitude = utils.Settings.GROUND_ALTITUDE_M # cheating but whatever
 
         # variables for the ejection algorithm
-        self.EJ_MAIN_DEPLOYMENT = 1500
+        self.EJ_MAIN_DEPLOYMENT = 1500 * 0.3048 # ft to m conversion
         self.EJ_LANDING_SAMPLES = 50
-        self.EJ_LANDING_THRESHOLD = 5
+        self.EJ_LANDING_THRESHOLD = 0.5
         self.EJ_LAUNCH_THRESHOLD = 50 
         self.EJ_NUM_MEAS_REG = 50
 
@@ -35,7 +35,7 @@ class Flight_Computer:
 
 
     def parse_telemetry(self, telemetry):
-        # expects telemetry in form of 'S,AccX,AccY,AccZ,Pressure,E\r\n'
+        # expects telemetry in form of 'S,AccX,AccY,AccZ,Altitude,E\r\n'
         if telemetry[0] != 'S' or telemetry[-3:] != 'E\r\n':
             print('Error: FC Mock - could not parse telemetry')
         else:
@@ -44,9 +44,9 @@ class Flight_Computer:
             self.accX = float(splitted[0])
             self.accY = float(splitted[1])
             self.accZ = float(splitted[2])
-            self.pressure = float(splitted[3])
+            self.altitude = float(splitted[3])
 
-            self.update_altitude_array(self.pressure)
+            self.update_altitude_array(self.altitude)
     
     def get_control_response(self):
         response = 'C,%d,E\r\n' % (self.flight_state.value)
@@ -55,8 +55,8 @@ class Flight_Computer:
     def pressure2altitude(self, pressure):
         return 145442.1609 * (1.0 - pow(pressure/utils.Settings.LOCAL_PRESSURE_hPa, 0.190266436))
     
-    def update_altitude_array(self, pressure):
-        altitude = self.pressure2altitude(pressure)
+    def update_altitude_array(self, altitude):
+        # altitude = self.pressure2altitude(altitude)
         self.alt_previous[self.alt_previous_idx] = altitude
         self.alt_previous_idx = (self.alt_previous_idx + 1) % self.EJ_NUM_MEAS_REG
 
@@ -77,7 +77,7 @@ class Flight_Computer:
             for i in range(self.EJ_NUM_MEAS_REG):
                 y_values.append(self.alt_previous[(self.alt_previous_idx + i) % self.EJ_NUM_MEAS_REG])
             result = stats.linregress(x_values, y_values)
-            if result.slope < 0.2:
+            if result.slope < -0:
                 self.flight_state = utils.FLIGHT_STATES.DROGUE_DESCENT
         
         elif self.flight_state == utils.FLIGHT_STATES.DROGUE_DESCENT:
@@ -88,7 +88,7 @@ class Flight_Computer:
         elif self.flight_state == utils.FLIGHT_STATES.MAIN_DESCENT:
             min_alt = np.min(self.alt_previous)
             max_alt = np.max(self.alt_previous)
-            if max_alt - min_alt < self.EJ_LANDING_THRESHOLD:
+            if max_alt - min_alt == 0:
                 self.flight_state = utils.FLIGHT_STATES.LANDED
 
     def update_sim_step(self, telemetry):

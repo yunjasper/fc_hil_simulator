@@ -19,11 +19,11 @@ class Settings:
     LOCAL_PRESSURE_hPa = 1018 # hPa
 
     # rocket parameters for simulation
-    RKT_MASS_KG = 50
-    RKT_DROGUE_DRAG_COEFF = 10
-    RKT_DROGUE_AREA = 10
-    RKT_MAIN_DRAG_COEFF = 50
-    RKT_MAIN_AREA = 50
+    RKT_MASS_KG = 65
+    RKT_DROGUE_DRAG_COEFF = 1.5
+    RKT_DROGUE_AREA = 3.14 * (1.21 ** 2)
+    RKT_MAIN_DRAG_COEFF = 2.2
+    RKT_MAIN_AREA = 3.14 * (3.66 ** 2)
     RKT_LAUNCH_ANGLE = 90
     RKT_THRUST_CURVE_FILE = 'Cesaroni_14263N3400-P.rse' # rse file -- filename relative to this file
 

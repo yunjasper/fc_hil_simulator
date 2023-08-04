@@ -95,6 +95,9 @@ class Simulation:
             # account for main parachute drag, assume only in z direction for now
             force_main = rkt.main_drag_coeff * utils.Settings.AIR_MASS_DENSITY * (self.rkt_vel_z ** 2) * rkt.main_area_m2 / 2
             force_z = force_main - rocket_weight
+            
+            if self.rkt_pos_z <= utils.Settings.GROUND_ALTITUDE_M:
+                force_z = 0
         
         elif self.flight_state == utils.FLIGHT_STATES.LANDED:
             # nothing to do
@@ -102,8 +105,11 @@ class Simulation:
             force_z = 0
 
         if force_z <= 0 and self.rkt_pos_z <= utils.Settings.GROUND_ALTITUDE_M: # can't go down, only up
+            # rocket is not moving
             self.rkt_acc_z = 0
             self.rkt_acc_x = 0
+            self.rkt_vel_z = 0
+            self.rkt_vel_x = 0
         else:
             # calculate resultant accelerations (F = m*a)
             self.rkt_acc_x = force_x / rkt.dry_mass_kg
@@ -128,7 +134,8 @@ class Simulation:
         cols = ['time (ms)', 'position x (m)', 'position z (m)', 'velocity x (m/s)', 'velocity z (m/s)',
                    'acceleration x (m/s2)', 'acceleration z (m/s2)', 'flight state']
         datatable = pd.DataFrame(columns=cols) # empty
-        for point in self.datalog: # now add entries (rows)
+        for idx in np.arange(len(self.datalog), step=1000):
+            point = self.datalog[idx]
             datatable.loc[len(datatable)] = point.unwrap()
 
         # find state change time indices
@@ -145,23 +152,26 @@ class Simulation:
         plt.rc('grid', linestyle='--')
 
         fig, ax = plt.subplots(3, 2)
-        ax[0][0].plot(datatable['time (ms)'], datatable['position x (m)'])
+        time_values_s = datatable['time (ms)'] / 1000
+        ax[0][0].plot(time_values_s, datatable['position x (m)'])
         for idx in state_change_indices:
-            ax[0][0].axvline(datatable['time (ms)'][idx], color='red')
+            ax[0][0].axvline(time_values_s[idx], color='red')
         ax[0][0].set_ylabel('position x (m)')
-        ax[1][0].plot(datatable['time (ms)'], datatable['velocity x (m/s)'])
+        ax[1][0].plot(time_values_s, datatable['velocity x (m/s)'])
         ax[1][0].set_ylabel('velocity x (m/s)')
-        ax[2][0].plot(datatable['time (ms)'], datatable['acceleration x (m/s2)'])
+        ax[2][0].plot(time_values_s, datatable['acceleration x (m/s2)'])
         ax[2][0].set_ylabel('acceleration x (m/s2)')
-        ax[2][0].set_xlabel('time (ms)')
+        ax[2][0].set_xlabel('time (s)')
 
-        ax[0][1].plot(datatable['time (ms)'], datatable['position z (m)'])
+        ax[0][1].plot(time_values_s, datatable['position z (m)'])
+        for idx in state_change_indices:
+            ax[0][1].axvline(time_values_s[idx], color='red')
         ax[0][1].set_ylabel('position z (m)')
-        ax[1][1].plot(datatable['time (ms)'], datatable['velocity z (m/s)'])
+        ax[1][1].plot(time_values_s, datatable['velocity z (m/s)'])
         ax[1][1].set_ylabel('velocity z (m/s)')
-        ax[2][1].plot(datatable['time (ms)'], datatable['acceleration z (m/s2)'])
+        ax[2][1].plot(time_values_s, datatable['acceleration z (m/s2)'])
         ax[2][1].set_ylabel('acceleration z (m/s2)')
-        ax[2][1].set_xlabel('time (ms)')
+        ax[2][1].set_xlabel('time (s)')
 
         plt.show()
 
@@ -207,11 +217,12 @@ def main():
         sim.log_data()
         # send data to controller
         hw.send(sim.datalog[-1])
-        hw_flight_state = hw.read_hw_state()
-        print('t = %d ms\tpos z = %.3f m\tstate = %d' % (sim.time, sim.rkt_pos_z, sim.flight_state.value))
+        if (sim.time % 100 == 0):
+            hw_flight_state = hw.read_hw_state()
+            sim.flight_state = hw_flight_state
+            print('t = %d ms\tpos z = %.3f m\tstate = %d' % (sim.time, sim.rkt_pos_z, sim.flight_state.value))
         # if hw_flight_state == utils.FLIGHT_STATES.BOOST and sim.flight_state == utils.FLIGHT_STATES.PAD:
         #     sim.launch_time = sim.time # needed because thrust curve time starts at zero
-        sim.flight_state = hw_flight_state
         sim.increment_tick()
         
         # sleep time :)
