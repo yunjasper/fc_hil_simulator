@@ -33,6 +33,10 @@ BAUD_RATE = 115200
 SERIAL_PORT_TIMEOUT = 5 # seconds
 
 class Simulation:
+
+    data_column_names = ['time (ms)', 'position x (m)', 'position z (m)', 'position z (noisy) (m)', 'velocity x (m/s)', 
+                'velocity z (m/s)', 'acceleration x (m/s2)', 'acceleration z (m/s2)', 'flight state']
+
     def __init__(self) -> None:
         self.time = 0
         self.launch_time = 0
@@ -50,6 +54,8 @@ class Simulation:
         self.rkt_flight_state = utils.FLIGHT_STATES.PAD
 
         self.datalog = [] # list of utils.Sim_DataPoint objects
+        self.datatable = None # datalog to be converted into pandas DataFrame in this variable after sim ends
+        self.session_folder = None # folder name where outputs will be saved
         
     def set_timestep_ms(self, timestep_ms):
         self.timestep_ms = timestep_ms
@@ -131,17 +137,48 @@ class Simulation:
         dp = utils.Sim_DataPoint(self.time, self.rkt_pos_x, self.rkt_pos_z, self.rkt_pos_z_noisy, 
                                  self.rkt_vel_x, self.rkt_vel_z, self.rkt_acc_x, self.rkt_acc_z, self.rkt_flight_state)
         self.datalog.append(dp)
-        
-    def plot_simulation_results(self):
-        cols = ['time (ms)', 'position x (m)', 'position z (m)', 'position z (noisy) (m)', 'velocity x (m/s)', 
-                'velocity z (m/s)', 'acceleration x (m/s2)', 'acceleration z (m/s2)', 'flight state']
-        datatable = pd.DataFrame(columns=cols) # empty
-        for idx in np.arange(len(self.datalog), step=1000):
+
+    def convert_log_to_df(self, stride):
+        print('Converting simulation session data...')
+        conversion_progress_percent = 0
+
+        datatable = pd.DataFrame(columns=self.data_column_names) # empty, to be filled in
+        indices = np.arange(len(self.datalog), step=stride)
+        for i in range(len(indices)):
+            idx = indices[i]
             point = self.datalog[idx]
             datatable.loc[len(datatable)] = point.unwrap()
+            
+            # print conversion progress indicator
+            if int(i / len(indices) * 100) >= conversion_progress_percent + 10:
+                conversion_progress_percent += 10
+                print('{}% done...'.format(conversion_progress_percent))
+        
+        print('100% done\n') # newline
+        self.datatable = datatable
+    
+    def save_sim_log_to_file(self):
+        settings = utils.Settings() # need to create the object to use the method
+        base_filename = utils.Settings.SIMULATION_LOG_FILENAME_FORMAT + time.strftime('%Y-%m-%d_%H-%M-%S')
+        self.session_folder = base_filename
+        os.mkdir(base_filename)
+        os.chdir(base_filename)
+        filename =  base_filename + '_SETTINGS.csv'
+        f = open(filename, 'w')
+        f.write(settings.format_rocket())
+        f.write(settings.format_sim_settings())
+        f.close()
+        filename = base_filename + '_DATA.csv'
+        f = open(filename, 'w')
+        self.convert_log_to_df(stride=utils.Settings.DATA_SAVE_STRIDE_LOG)
+        self.datatable.to_csv(filename, sep=',', columns=self.data_column_names, mode='a', index=False)
+        f.close()
+
+    def plot_simulation_results(self):
+        self.convert_log_to_df(stride=utils.Settings.DATA_SAVE_STRIDE_PLOT)
 
         # find state change time indices
-        states = datatable['flight state']
+        states = self.datatable['flight state']
         state_change_indices = []
         previous_state = utils.FLIGHT_STATES.PAD
         for i in range(len(states)):
@@ -153,28 +190,35 @@ class Simulation:
         plt.rc('axes', grid=True)
         plt.rc('grid', linestyle='--')
 
-        fig, ax = plt.subplots(3, 2)
-        time_values_s = datatable['time (ms)'] / 1000
-        ax[0][0].plot(time_values_s, datatable['position x (m)'])
+        figX, axX = plt.subplots(3, 1)
+        time_values_s = self.datatable['time (ms)'] / 1000
+        axX[0].plot(time_values_s, self.datatable['position x (m)'])
         for idx in state_change_indices:
-            ax[0][0].axvline(time_values_s[idx], color='red')
-        ax[0][0].set_ylabel('position x (m)')
-        ax[1][0].plot(time_values_s, datatable['velocity x (m/s)'])
-        ax[1][0].set_ylabel('velocity x (m/s)')
-        ax[2][0].plot(time_values_s, datatable['acceleration x (m/s2)'])
-        ax[2][0].set_ylabel('acceleration x (m/s2)')
-        ax[2][0].set_xlabel('time (s)')
+            axX[0].axvline(time_values_s[idx], color='red')
+        axX[0].set_ylabel('position x (m)')
+        axX[1].plot(time_values_s, self.datatable['velocity x (m/s)'])
+        axX[1].set_ylabel('velocity x (m/s)')
+        axX[2].plot(time_values_s, self.datatable['acceleration x (m/s2)'])
+        axX[2].set_ylabel('acceleration x (m/s2)')
+        axX[2].set_xlabel('time (s)')
 
-        ax[0][1].plot(time_values_s, datatable['position z (noisy) (m)'])
-        ax[0][1].plot(time_values_s, datatable['position z (m)'])
+        figZ, axZ = plt.subplots(3, 1)
+        axZ[0].plot(time_values_s, self.datatable['position z (noisy) (m)'])
+        axZ[0].plot(time_values_s, self.datatable['position z (m)'])
         for idx in state_change_indices:
-            ax[0][1].axvline(time_values_s[idx], color='red')
-        ax[0][1].set_ylabel('position z (m)')
-        ax[1][1].plot(time_values_s, datatable['velocity z (m/s)'])
-        ax[1][1].set_ylabel('velocity z (m/s)')
-        ax[2][1].plot(time_values_s, datatable['acceleration z (m/s2)'])
-        ax[2][1].set_ylabel('acceleration z (m/s2)')
-        ax[2][1].set_xlabel('time (s)')
+            axZ[0].axvline(time_values_s[idx], color='red')
+        axZ[0].set_ylabel('position z (m)')
+        axZ[1].plot(time_values_s, self.datatable['velocity z (m/s)'])
+        axZ[1].set_ylabel('velocity z (m/s)')
+        axZ[2].plot(time_values_s, self.datatable['acceleration z (m/s2)'])
+        axZ[2].set_ylabel('acceleration z (m/s2)')
+        axZ[2].set_xlabel('time (s)')
+
+        # save plots
+        if os.path.basename(os.getcwd()) != self.session_folder:
+            os.chdir(self.session_folder)
+        figX.savefig(self.session_folder + '_x_axis_plots.png', dpi=300)
+        figZ.savefig(self.session_folder + '_z_axis_plots.png', dpi=300)
 
         plt.show()
 
@@ -241,7 +285,8 @@ def main():
             
         
         if (sim.time % utils.Settings.PRINT_UPDATE_TIMESTEP_MS == 0):
-            print('t = %d ms\tpos z = %.3f m\tsim state = %d\trkt state = %d' % (sim.time, sim.rkt_pos_z, sim.sim_flight_state.value, sim.rkt_flight_state.value))
+            # print('t = %d ms\tpos z = %.3f m\tsim state = %d\trkt state = %d' % (sim.time, sim.rkt_pos_z, sim.sim_flight_state.value, sim.rkt_flight_state.value))
+            print(sim.datalog[-1].format_z() + '\tsimState = ' + str(sim.sim_flight_state.value))
 
         # if hw_flight_state == utils.FLIGHT_STATES.BOOST and sim.flight_state == utils.FLIGHT_STATES.PAD:
         #     sim.launch_time = sim.time # needed because thrust curve time starts at zero
@@ -255,6 +300,7 @@ def main():
                 time.sleep(sleep_time_ns / 100000000000) # sleep argument is in seconds
     
     # save data to file (todo)
+    sim.save_sim_log_to_file()
     
     # plot results
     sim.plot_simulation_results()

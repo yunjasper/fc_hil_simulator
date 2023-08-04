@@ -19,15 +19,6 @@ class Settings:
     GROUND_ALTITUDE_M = 0
     LOCAL_PRESSURE_hPa = 1018 # hPa
 
-    # simulation parameters
-    SIMULATION_TIMESTEP_MS = 10
-    HARDWARE_UPDATE_TIMESTEP_MS = 10 * SIMULATION_TIMESTEP_MS
-    PRINT_UPDATE_TIMESTEP_MS = 10 * SIMULATION_TIMESTEP_MS # frequency of printing to console
-    USE_NOISY_ALTITUDE = False
-    ALTITUDE_NOISE_MAX_AMPLITUDE_M = 10
-    USE_HARDWARE_TARGET = False
-    SIMULATION_SW_TARGET_LAUNCH_TIME_MS = 1000
-
     # communication over serial with FC
     PACKET_HEADER = 0xFFFF0000  # 32-bit value
     PACKET_TRAILER = 0x0000FFFF # 32-bit value
@@ -43,6 +34,37 @@ class Settings:
     RKT_LAUNCH_ANGLE = 90
     # RKT_THRUST_CURVE_FILE = 'Cesaroni_21062O3400-P.rse' # rse file -- filename relative to this file
     RKT_THRUST_CURVE_FILE = 'Cesaroni_14263N3400-P.rse'
+
+    # simulation parameters
+    SIMULATION_TIMESTEP_MS = 10
+    HARDWARE_UPDATE_TIMESTEP_MS = 10 * SIMULATION_TIMESTEP_MS
+    PRINT_UPDATE_TIMESTEP_MS = 10 * SIMULATION_TIMESTEP_MS # frequency of printing to console
+    USE_NOISY_ALTITUDE = False
+    ALTITUDE_NOISE_MAX_AMPLITUDE_M = 10
+    USE_HARDWARE_TARGET = False
+    SIMULATION_SW_TARGET_LAUNCH_TIME_MS = 1000
+    SIMULATION_LOG_FILENAME_FORMAT = 'sim_log_' + RKT_THRUST_CURVE_FILE[:-4]
+
+    # data saving parameters
+    DATA_SAVE_STRIDE_LOG = 10 # stride of data saved to csv file
+    DATA_SAVE_STRIDE_PLOT = 1000 # stride of data plotted
+
+
+    def format_rocket(self) -> str:
+        """returns string in csv (comma-separated) format of rocket parameters"""
+        return ('rocket parameters\nmass_kg, %.3f\ndrogue cd, %.3f\ndrogue area_m2, %.3f\nmain cd, \
+                %.3f\nmain area_m2, %.3f\nlaunch angle_deg, %.3f\nthrust curve filename, %s\n\n' 
+                % (self.RKT_MASS_KG, self.RKT_DROGUE_DRAG_COEFF, self.RKT_DROGUE_AREA, self.RKT_MAIN_DRAG_COEFF, 
+                   self.RKT_MAIN_AREA, self.RKT_LAUNCH_ANGLE, self.RKT_THRUST_CURVE_FILE))
+    
+    def format_sim_settings(self) -> str:
+        """returns string in csv (comma-separated) format of simulation parameters"""
+        return ('simulation settings\ntimestep (ms), %.3f\nhardware update timestep (ms), %.3f\nprint update timestep (ms), \
+                %.3f\nuse noisy altitude (boolean), %s\naltitude noise max amplitude (m), \
+                %.3f\nuse hardware target (boolean), %s\nsim sw target launch time (ms), %.3f\nstride data save, %d\nstride data plot, %d\n\n' 
+                % (self.SIMULATION_TIMESTEP_MS, self.HARDWARE_UPDATE_TIMESTEP_MS, self.PRINT_UPDATE_TIMESTEP_MS, 
+                   self.USE_NOISY_ALTITUDE, self.ALTITUDE_NOISE_MAX_AMPLITUDE_M, self.USE_HARDWARE_TARGET, 
+                   self.SIMULATION_SW_TARGET_LAUNCH_TIME_MS, self.DATA_SAVE_STRIDE_LOG, self.DATA_SAVE_STRIDE_PLOT))
 
 # used to track states of the simulation
 class FLIGHT_STATES(Enum):
@@ -68,5 +90,16 @@ class Sim_DataPoint:
         self.rkt_flight_state = flight_state
     
     def unwrap(self):
-        return [self.time, self.rkt_pos_x, self.rkt_pos_z, self.rkt_pos_z_noisy, self.rkt_vel_x, self.rkt_vel_z, self.rkt_acc_x, self.rkt_acc_z, self.rkt_flight_state]
+        return [self.time, self.rkt_pos_x, self.rkt_pos_z, self.rkt_pos_z_noisy, self.rkt_vel_x, self.rkt_vel_z, self.rkt_acc_x, self.rkt_acc_z, self.rkt_flight_state.name]
         
+    def format_all(self) -> str:
+        return ('t = %d ms, posX = %.3f m, posZ = %.3f m, velX = %.3f m/s, velZ = %.3f m/s, accX = %.3f m/s2, accZ = %.3f m/s2, rktState = %d' %
+                (self.time, self.rkt_pos_x, self.rkt_pos_z, self.rkt_vel_x, self.rkt_vel_z, self.rkt_acc_x, self.rkt_acc_z, self.rkt_flight_state.value))
+    
+    def format_z(self):
+        return ('t = %d ms, posZ = %.3f m, velZ = %.3f m/s, accZ = %.3f m/s2, rktState = %d' % 
+                (self.time, self.rkt_pos_z, self.rkt_vel_z, self.rkt_acc_z, self.rkt_flight_state.value))
+    
+    def format_x(self):
+        return ('t = %d ms, posX = %.3f m, velX = %.3f m/s, accX = %.3f m/s2, rktState = %d' %
+                (self.time, self.rkt_pos_x, self.rkt_vel_x, self.rkt_acc_x, self.rkt_flight_state.value))
