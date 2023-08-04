@@ -22,7 +22,9 @@ typedef enum {
 	DROGUE_DESCENT = 3,
 	MAIN_DESCENT = 4,
 	LANDED = 5,
+	LAUNCH_COMMAND = 8,
 	FS_ERROR = 9
+
 } flight_state_t;
 
 

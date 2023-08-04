@@ -223,16 +223,15 @@ def main():
             # send data to controller
             hw.send(sim.datalog[-1])
             hw_flight_state = hw.read_hw_state()
-            if hw_flight_state == utils.FLIGHT_STATES.LAUNCH_COMMAND_START_SIM and sim.launched == False:
-                sim.sim_flight_state = utils.FLIGHT_STATES.BOOST
-                sim.launch_time = sim.time
-                sim.launched = True
-
             if utils.Settings.USE_HARDWARE_TARGET == False:
                 if sim.time > utils.Settings.SIMULATION_SW_TARGET_LAUNCH_TIME_MS and sim.launched == False:
                     sim.sim_flight_state = utils.FLIGHT_STATES.BOOST
                     sim.launch_time = sim.time
                     sim.launched = True
+            elif hw_flight_state == utils.FLIGHT_STATES.LAUNCH_COMMAND_START_SIM and sim.launched == False:
+                sim.sim_flight_state = utils.FLIGHT_STATES.BOOST
+                sim.launch_time = sim.time
+                sim.launched = True
             
             sim.rkt_flight_state = hw_flight_state
             if (hw_flight_state == utils.FLIGHT_STATES.DROGUE_DESCENT 
@@ -251,8 +250,8 @@ def main():
         # sleep time :)
         end_time_ns = time.time_ns()
         sleep_time_ns = sim.timestep_ms * 1000000 - (end_time_ns - start_time_ns)
-        # if sleep_time_ns > 0:
-        #     time.sleep(sleep_time_ns / 1000000000) # sleep argument is in seconds
+        if sleep_time_ns > 0:
+            time.sleep(sleep_time_ns / 1000000000) # sleep argument is in seconds
     
     # save data to file (todo)
     

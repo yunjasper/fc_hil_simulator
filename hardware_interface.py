@@ -69,11 +69,13 @@ class Hardware_Interface:
             in_bytes = self.com_port.in_waiting
             while in_bytes != 0:
                 control_response = self.com_port.read(Hardware_Interface.CONTROL_RESPONSE_PACKET_LENGTH).decode('utf-8')
-                print('Control response: ' + control_response)
+                # print('Control response: ' + control_response)
                 flight_state = self.parse_control_response(control_response)
-                if (flight_state != utils.FLIGHT_STATES.LAUNCH_COMMAND_START_SIM): 
-                    self.flight_state = flight_state # update flight state
-            
+                if (flight_state == utils.FLIGHT_STATES.LAUNCH_COMMAND_START_SIM): 
+                    return flight_state
+                
+                self.flight_state = flight_state
+                in_bytes -= Hardware_Interface.CONTROL_RESPONSE_PACKET_LENGTH
             return self.flight_state
             
         else:
