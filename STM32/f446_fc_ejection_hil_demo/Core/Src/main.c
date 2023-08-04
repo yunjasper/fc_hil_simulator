@@ -174,13 +174,23 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
+  // reset all debug GPIOs (ARD_D0-D7)
+  HAL_GPIO_WritePin(ARD_D0_GPIO_Port, ARD_D0_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(ARD_D1_GPIO_Port, ARD_D1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(ARD_D2_GPIO_Port, ARD_D2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(ARD_D3_GPIO_Port, ARD_D3_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(ARD_D4_GPIO_Port, ARD_D4_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(ARD_D5_GPIO_Port, ARD_D5_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(ARD_D6_GPIO_Port, ARD_D6_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(ARD_D7_GPIO_Port, ARD_D7_Pin, GPIO_PIN_RESET);
+
   // ejection init
   config_timer_freq(TIM2, EJ_ALGO_UPDATE_RATE_HZ);
   ej_init();
 
   // start timers and DMA
   HAL_UART_Receive_DMA(&huart3, uart3_rx_dma_buffer, RX_TELEMETRY_LENGTH);
-  HAL_TIM_Base_Start_IT(&htim2);
+//  HAL_TIM_Base_Start_IT(&htim2);
 
 
 
@@ -201,12 +211,20 @@ int main(void)
 	  }
 
 	  if (rx_telemetry_flag) {
+		  HAL_GPIO_WritePin(ARD_D0_GPIO_Port, ARD_D0_Pin, GPIO_PIN_SET); // entire block takes 650 us to run. limited by uart probably
+
 		  struct ej_data datapoint;
 		  parse_telemetry(uart3_rx_dma_buffer, &datapoint);
-		  ej_update_flight_state(&datapoint, &fs);
+
+		  HAL_GPIO_WritePin(ARD_D1_GPIO_Port, ARD_D1_Pin, GPIO_PIN_SET);
+		  ej_update_flight_state(&datapoint, &fs); // takes 25 us to run
+		  HAL_GPIO_WritePin(ARD_D1_GPIO_Port, ARD_D1_Pin, GPIO_PIN_RESET);
+
 		  send_flight_state(&fs);
 		  rx_telemetry_flag = 0;
 		  HAL_UART_Receive_DMA(&huart3, uart3_rx_dma_buffer, RX_TELEMETRY_LENGTH);
+
+		  HAL_GPIO_WritePin(ARD_D0_GPIO_Port, ARD_D0_Pin, GPIO_PIN_RESET);
 	  }
     /* USER CODE END WHILE */
 

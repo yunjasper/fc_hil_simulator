@@ -250,8 +250,9 @@ def main():
         # sleep time :)
         end_time_ns = time.time_ns()
         sleep_time_ns = sim.timestep_ms * 1000000 - (end_time_ns - start_time_ns)
-        if sleep_time_ns > 0:
-            time.sleep(sleep_time_ns / 1000000000) # sleep argument is in seconds
+        if utils.Settings.USE_HARDWARE_TARGET:
+            if sleep_time_ns > 0:
+                time.sleep(sleep_time_ns / 100000000000) # sleep argument is in seconds
     
     # save data to file (todo)
     
