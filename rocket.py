@@ -38,7 +38,7 @@ class Rocket:
         else:
             return 0
     
-    def get_engine_mass_kg(self, time_s) -> float:
+    def get_engine_propellant_mass_kg(self, time_s) -> float:
         if time_s < self.tc_burn_time:
             return np.interp(time_s, self.tc_time_s, self.tc_mass_kg)
         else:

@@ -125,7 +125,7 @@ void parse_telemetry(uint8_t *buffer, struct ej_data *data) {
 	telemetry_t *t = (telemetry_t *)(buffer);
 	data->accX = t->accX;
 	data->accZ = t->accZ;
-	data->altitude = t->altitude;
+	data->altitude = t->altitude * 3.3028; // received alt is in m, convert to ft
 	// add more checks if desired
 }
 

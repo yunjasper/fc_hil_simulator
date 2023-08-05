@@ -56,7 +56,7 @@ struct ej_data {
 #define MAIN_NUM_DESCENDING_SAMPLES		20
 #define LANDING_NUM_DESCENDING_SAMPLES	100		// number of samples needed to set as landing
 #define MAIN_DEPLOY_ALTITUDE			1500	// ft
-#define LANDING_ALT_CHANGE_THRESHOLD	5		// ft
+#define LANDING_ALT_CHANGE_THRESHOLD	2		// ft
 
 #define LOCAL_PRESSURE_HPA		1028	// hPa
 

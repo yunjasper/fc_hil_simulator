@@ -55,7 +55,10 @@ class Simulation:
 
         self.datalog = [] # list of utils.Sim_DataPoint objects
         self.datatable = None # datalog to be converted into pandas DataFrame in this variable after sim ends
-        self.session_folder = None # folder name where outputs will be saved
+        
+        base_filename = utils.Settings.SIMULATION_LOG_FILENAME_FORMAT + time.strftime('%Y-%m-%d_%H-%M-%S')
+        self.session_folder = base_filename # folder name where outputs will be saved
+        os.mkdir(self.session_folder)
         
     def set_timestep_ms(self, timestep_ms):
         self.timestep_ms = timestep_ms
@@ -69,7 +72,7 @@ class Simulation:
         force_z = 0
 
         # calculate forces in x and z directions based on the flight phase
-        rocket_weight = utils.Settings.GRAVITY * (rkt.dry_mass_kg + rkt.get_engine_mass_kg((self.time - self.launch_time) / 1000))
+        rocket_weight = utils.Settings.GRAVITY * (rkt.dry_mass_kg + rkt.get_engine_propellant_mass_kg((self.time - self.launch_time) / 1000))
 
         if self.sim_flight_state == utils.FLIGHT_STATES.PAD:
             # rocket is stationary on the launch rail, all forces are balanced --> zero acceleration
@@ -96,6 +99,7 @@ class Simulation:
             # account for drogue parachute drag, assume only in z direction for now
             force_drogue = rkt.drogue_drag_coeff * utils.Settings.AIR_MASS_DENSITY * (self.rkt_vel_z ** 2) * rkt.drogue_area_m2 / 2
             force_z = force_drogue - rocket_weight
+            print('drogue : f_p = %.3f\tf_z = %.3f\trw = %.3f' % (force_drogue, force_z, rocket_weight))
         
         elif self.sim_flight_state == utils.FLIGHT_STATES.MAIN_DESCENT:
             force_x = 0
@@ -105,6 +109,8 @@ class Simulation:
             
             if self.rkt_pos_z <= utils.Settings.GROUND_ALTITUDE_M:
                 force_z = 0
+            
+            print('main : f_p = %.3f\tf_z = %.3f\trw = %.3f' % (force_main, force_z, rocket_weight))
         
         elif self.sim_flight_state == utils.FLIGHT_STATES.LANDED:
             # nothing to do
@@ -159,20 +165,18 @@ class Simulation:
     
     def save_sim_log_to_file(self):
         settings = utils.Settings() # need to create the object to use the method
-        base_filename = utils.Settings.SIMULATION_LOG_FILENAME_FORMAT + time.strftime('%Y-%m-%d_%H-%M-%S')
-        self.session_folder = base_filename
-        os.mkdir(base_filename)
-        os.chdir(base_filename)
-        filename =  base_filename + '_SETTINGS.csv'
+        os.chdir(self.session_folder)
+        filename =  self.session_folder + '_SETTINGS.csv'
         f = open(filename, 'w')
         f.write(settings.format_rocket())
         f.write(settings.format_sim_settings())
         f.close()
-        filename = base_filename + '_DATA.csv'
+        filename = self.session_folder + '_DATA.csv'
         f = open(filename, 'w')
         self.convert_log_to_df(stride=utils.Settings.DATA_SAVE_STRIDE_LOG)
         self.datatable.to_csv(filename, sep=',', columns=self.data_column_names, mode='a', index=False)
         f.close()
+        os.chdir(os.pardir)
 
     def plot_simulation_results(self):
         self.convert_log_to_df(stride=utils.Settings.DATA_SAVE_STRIDE_PLOT)
@@ -219,7 +223,7 @@ class Simulation:
             os.chdir(self.session_folder)
         figX.savefig(self.session_folder + '_x_axis_plots.png', dpi=300)
         figZ.savefig(self.session_folder + '_z_axis_plots.png', dpi=300)
-
+        os.chdir(os.pardir)
         plt.show()
 
 def open_COM_port() -> serial.Serial:
@@ -300,7 +304,7 @@ def main():
                 time.sleep(sleep_time_ns / 100000000000) # sleep argument is in seconds
     
     # save data to file (todo)
-    sim.save_sim_log_to_file()
+    # sim.save_sim_log_to_file()
     
     # plot results
     sim.plot_simulation_results()

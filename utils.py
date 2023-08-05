@@ -25,29 +25,33 @@ class Settings:
 
     # rocket parameters for simulation
     RKT_MASS_KG = 60
-    # RKT_DROGUE_DRAG_COEFF = 1.5 # porthos drogue
-    RKT_DROGUE_DRAG_COEFF = 3
+    RKT_DROGUE_DRAG_COEFF = 1.5 # porthos drogue
     RKT_DROGUE_AREA = 3.14 * (1.21 ** 2)
-    # RKT_MAIN_DRAG_COEFF = 2.2 # porthos main
-    RKT_MAIN_DRAG_COEFF = 5
+    RKT_MAIN_DRAG_COEFF = 2.2 # porthos main
     RKT_MAIN_AREA = 3.14 * (3.66 ** 2)
     RKT_LAUNCH_ANGLE = 90
     # RKT_THRUST_CURVE_FILE = 'Cesaroni_21062O3400-P.rse' # rse file -- filename relative to this file
     RKT_THRUST_CURVE_FILE = 'Cesaroni_14263N3400-P.rse'
 
+    # uncomment for test case with no parachutes. trajectory should be a perfect parabola
+    # RKT_DROGUE_DRAG_COEFF = 0
+    # RKT_DROGUE_AREA = 0
+    # RKT_MAIN_DRAG_COEFF = 0
+    # RKT_MAIN_AREA = 0
+    
     # simulation parameters
+    USE_HARDWARE_TARGET = False
     SIMULATION_TIMESTEP_MS = 10
     HARDWARE_UPDATE_TIMESTEP_MS = 10 * SIMULATION_TIMESTEP_MS
     PRINT_UPDATE_TIMESTEP_MS = 10 * SIMULATION_TIMESTEP_MS # frequency of printing to console
     USE_NOISY_ALTITUDE = False
     ALTITUDE_NOISE_MAX_AMPLITUDE_M = 10
-    USE_HARDWARE_TARGET = False
-    SIMULATION_SW_TARGET_LAUNCH_TIME_MS = 1000
+    SIMULATION_SW_TARGET_LAUNCH_TIME_MS = 10
     SIMULATION_LOG_FILENAME_FORMAT = 'sim_log_' + RKT_THRUST_CURVE_FILE[:-4]
 
     # data saving parameters
     DATA_SAVE_STRIDE_LOG = 10 # stride of data saved to csv file
-    DATA_SAVE_STRIDE_PLOT = 1000 # stride of data plotted
+    DATA_SAVE_STRIDE_PLOT = 10 # stride of data plotted
 
 
     def format_rocket(self) -> str:
