@@ -12,15 +12,15 @@ that indicates the flight state.
 author: jasper yun
 """
 
+import ambiance # barometric pressure from international standard atmosphere model
 import flight_computer_mock as fc
 import serial
 import struct
 import utils
 
 def altitude2pressure(altitude_m):
-        # pressure to altitude (ft): 145442.1609 * (1.0 - pow(pressure/LOCAL_PRESSURE, 0.190266436))
-        altitude_ft = altitude_m * 3.280839895
-        return utils.Settings.LOCAL_PRESSURE_hPa * pow(1 - altitude_ft / 145442.1609, 0.190266436)
+        """returns barometric pressure (hPa) corresponding to the given altitude (m)"""
+        return ambiance.Atmosphere(altitude_m).pressure[0] / 100
 
 class Hardware_Interface:
 
@@ -82,7 +82,6 @@ class Hardware_Interface:
             return self.flight_state
             
         else:
-
             control_response = self.mock_fc.get_control_response()
             flight_state = self.parse_control_response(control_response)
             self.flight_state = flight_state

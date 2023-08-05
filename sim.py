@@ -7,6 +7,7 @@ author: jasper yun
 """
 
 # "big" libraries
+import ambiance # atmospheric model
 from matplotlib import pyplot as plt
 import numpy as np
 import os
@@ -24,8 +25,6 @@ import utils
 # thrust (function of time) operates directly on the point
 # drag components impact trajectory through acceleration in x and z, potentially different drag coefficients
 # no wind to start
-
-# todo: add logging of all data for the simulation session
 
 # for now, hardcode the port. todo: make flexible 
 SERIAL_PORT = 'COM7'
@@ -99,13 +98,17 @@ class Simulation:
         elif self.sim_flight_state == utils.FLIGHT_STATES.DROGUE_DESCENT:
             force_x = 0
             # account for drogue parachute drag, assume only in z direction for now
-            force_drogue = rkt.drogue_drag_coeff * utils.Settings.AIR_MASS_DENSITY * (self.rkt_vel_z ** 2) * rkt.drogue_area_m2 / 2
+            air_mass_density = ambiance.Atmosphere(self.rkt_pos_z).density[0]
+            # air_mass_density = utils.Settings.AIR_MASS_DENSITY
+            force_drogue = rkt.drogue_drag_coeff * air_mass_density * (self.rkt_vel_z ** 2) * rkt.drogue_area_m2 / 2
             force_z = force_drogue - rocket_weight
         
         elif self.sim_flight_state == utils.FLIGHT_STATES.MAIN_DESCENT:
             force_x = 0
             # account for main parachute drag, assume only in z direction for now
-            force_main = rkt.main_drag_coeff * utils.Settings.AIR_MASS_DENSITY * (self.rkt_vel_z ** 2) * rkt.main_area_m2 / 2
+            air_mass_density = ambiance.Atmosphere(self.rkt_pos_z).density[0]
+            # air_mass_density = utils.Settings.AIR_MASS_DENSITY
+            force_main = rkt.main_drag_coeff * air_mass_density * (self.rkt_vel_z ** 2) * rkt.main_area_m2 / 2
             force_z = force_main - rocket_weight
             
             if self.rkt_pos_z <= utils.Settings.GROUND_ALTITUDE_M:
@@ -134,11 +137,7 @@ class Simulation:
         self.rkt_pos_z += self.rkt_vel_z * self.timestep_ms / 1000
         self.rkt_pos_z_noisy = self.rkt_pos_z + (np.random.rand(1, 1)[0][0] - 0.5) * utils.Settings.ALTITUDE_NOISE_MAX_AMPLITUDE_M
 
-        if self.time % 100 == 0:
-            a = 1 # added code to enable faster debugging
-            b = 2
-
-    def log_data(self):
+    def log_datapoint(self):
         dp = utils.Sim_DataPoint(self.time, self.rkt_pos_x, self.rkt_pos_z, self.rkt_pos_z_noisy, 
                                  self.rkt_vel_x, self.rkt_vel_z, self.rkt_acc_x, self.rkt_acc_z, self.rkt_flight_state)
         self.datalog.append(dp)
@@ -183,7 +182,7 @@ class Simulation:
         # find state change time indices
         states = self.datatable['flight state']
         state_change_indices = []
-        previous_state = utils.FLIGHT_STATES.PAD
+        previous_state = utils.FLIGHT_STATES.PAD.name
         for i in range(len(states)):
             if states[i] != previous_state:
                 state_change_indices.append(i)
@@ -198,6 +197,8 @@ class Simulation:
         axX[0].plot(time_values_s, self.datatable['position x (m)'])
         for idx in state_change_indices:
             axX[0].axvline(time_values_s[idx], color='red')
+        if self.datalog[-1].rkt_flight_state == utils.FLIGHT_STATES.LANDED:
+            axX[0].axvline(time_values_s[len(time_values_s) - 1], color='red')
         axX[0].set_ylabel('position x (m)')
         axX[1].plot(time_values_s, self.datatable['velocity x (m/s)'])
         axX[1].set_ylabel('velocity x (m/s)')
@@ -208,8 +209,11 @@ class Simulation:
         figZ, axZ = plt.subplots(3, 1)
         axZ[0].plot(time_values_s, self.datatable['position z (noisy) (m)'])
         axZ[0].plot(time_values_s, self.datatable['position z (m)'])
+        axZ[0].legend(['noisy', 'true'])
         for idx in state_change_indices:
             axZ[0].axvline(time_values_s[idx], color='red')
+        if self.datalog[-1].rkt_flight_state == utils.FLIGHT_STATES.LANDED:
+            axZ[0].axvline(time_values_s[len(time_values_s) - 1], color='red')
         axZ[0].set_ylabel('position z (m)')
         axZ[1].plot(time_values_s, self.datatable['velocity z (m/s)'])
         axZ[1].set_ylabel('velocity z (m/s)')
@@ -225,6 +229,7 @@ class Simulation:
         os.chdir(os.pardir)
         plt.show()
 
+# todo: move this (and the SERIAL_PORT config settings) into hardware_interface
 def open_COM_port() -> serial.Serial:
     try: 
         ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=SERIAL_PORT_TIMEOUT)
@@ -261,11 +266,12 @@ def main():
     hw = hardware_interface.Hardware_Interface(ser, sim.sim_flight_state, use_hw_target=utils.Settings.USE_HARDWARE_TARGET)
 
     # start simulation
+    # log initial conditions as a datapoint
+    sim.log_datapoint()
     while sim.rkt_flight_state != utils.FLIGHT_STATES.LANDED:
         start_time_ns = time.time_ns()
         
         sim.simulate_tick(rkt)
-        sim.log_data()
         if (sim.time % utils.Settings.HARDWARE_UPDATE_TIMESTEP_MS == 0):
             # send data to controller
             hw.send(sim.datalog[-1])
@@ -300,6 +306,7 @@ def main():
             # print('t = %d ms\tpos z = %.3f m\tsim state = %d\trkt state = %d' % (sim.time, sim.rkt_pos_z, sim.sim_flight_state.value, sim.rkt_flight_state.value))
             print(sim.datalog[-1].format_z() + '\tsimState = ' + str(sim.sim_flight_state.value))
 
+        sim.log_datapoint()
         sim.increment_tick()
         
         # sleep time :)
@@ -309,10 +316,9 @@ def main():
             if sleep_time_ns > 0:
                 time.sleep(sleep_time_ns / 100000000000) # sleep argument is in seconds
     
-    # save data to file (todo)
+    # final datapoint after exiting simulation
+    sim.log_datapoint()
     sim.save_sim_log_to_file()
-    
-    # plot results
     sim.plot_simulation_results()
     
 
