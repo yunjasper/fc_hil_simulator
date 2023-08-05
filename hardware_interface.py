@@ -43,7 +43,7 @@ class Hardware_Interface:
         # send data as string
         # data_packet = 'S,%.8f,0.000,%.8f,%.8f,E\r\n' % (data.rkt_acc_x, data.rkt_acc_z, altitude)
         # send data as struct (more efficient use of bytes on the line)
-        data_packet = struct.pack('LfffL', utils.Settings.PACKET_HEADER, data.rkt_acc_x, data.rkt_acc_z, altitude, utils.Settings.PACKET_TRAILER)
+        data_packet = struct.pack('LLfffL', utils.Settings.PACKET_HEADER, int(data.time), data.rkt_acc_x, data.rkt_acc_z, altitude, utils.Settings.PACKET_TRAILER)
         if self.use_target_hw:
             self.com_port.write(data_packet)
         else:
@@ -65,9 +65,10 @@ class Hardware_Interface:
     
     def read_hw_state(self) -> utils.FLIGHT_STATES:
         if self.use_target_hw:
-            # check for available data
-            in_bytes = self.com_port.in_waiting
-            while in_bytes >= Hardware_Interface.CONTROL_RESPONSE_PACKET_LENGTH:
+            # wait until data is available. assumption: computer is *much* faster than target
+            while self.com_port.in_waiting == 0:
+                pass
+            while self.com_port.in_waiting >= Hardware_Interface.CONTROL_RESPONSE_PACKET_LENGTH:
                 control_response = self.com_port.read(Hardware_Interface.CONTROL_RESPONSE_PACKET_LENGTH).decode('utf-8')
                 print('Control response: ' + control_response)
                 flight_state = self.parse_control_response(control_response)
@@ -78,7 +79,6 @@ class Hardware_Interface:
                     self.com_port.reset_input_buffer()
                 
                 self.flight_state = flight_state
-                in_bytes -= Hardware_Interface.CONTROL_RESPONSE_PACKET_LENGTH
             return self.flight_state
             
         else:

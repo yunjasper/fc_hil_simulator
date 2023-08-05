@@ -12,30 +12,9 @@
 #define INC_EJECTION_H_
 
 #include "stdint.h"
+#include "hil_sim_interface.h"
 
-#define EJ_ALGO_UPDATE_RATE_HZ		100
-
-typedef enum {
-	PAD = 0,
-	BOOST = 1,
-	COAST = 2,
-	DROGUE_DESCENT = 3,
-	MAIN_DESCENT = 4,
-	LANDED = 5,
-	LAUNCH_COMMAND = 8,
-	FS_ERROR = 9
-
-} flight_state_t;
-
-
-// struct which contains all data needed for ejection algorithm
-struct ej_data {
-	float accX;
-	float accZ;
-	float altitude;
-	flight_state_t fs;
-};
-
+#define EJ_ALGO_UPDATE_RATE_HZ		1
 
 // ejection algo defines
 
@@ -61,13 +40,13 @@ struct ej_data {
 #define LOCAL_PRESSURE_HPA		1028	// hPa
 
 
-
 // public variables
 extern volatile uint8_t is_launch_command_received;
 
 // function prototypes
 void ej_init(void);
-void ej_update_flight_state(struct ej_data *data, flight_state_t *fs);
+void ej_update_flight_state(flight_state_t *fs);
 void ej_get_flight_state(flight_state_t *fs);
+void ej_runAltitudeMeasurements(uint32_t currTick, float currAlt);
 
 #endif /* INC_EJECTION_H_ */

@@ -8,8 +8,6 @@
 
 #include "ejection.h"
 
-#include "stm32f4xx_hal.h" // for GetTick()
-
 // private defines
 #define NUM_MEAS_REG 	50	// samples for regression
 
@@ -31,12 +29,11 @@ float T;
 
 uint32_t prevTick;
 
-
 volatile uint8_t is_launch_command_received;
 
 // function prototypes
-void check_ejection_state(void);
-float runAltitudeMeasurements(uint32_t currTick, float currAlt);
+void ej_check_state(void);
+void ej_runAltitudeMeasurements(uint32_t currTick, float currAlt);
 
 void ej_init(void) {
 	ej_fs = PAD;
@@ -46,18 +43,29 @@ void ej_init(void) {
 		timalt_previous[i] = 0;
 		timsqr_previous[i] = 0;
 	}
+	prevTick = 0;
 }
 
 void ej_get_flight_state(flight_state_t *fs) {
 	*fs = ej_fs;
 }
 
-void ej_update_flight_state(struct ej_data *data, flight_state_t *fs) {
+void ej_update_flight_state(flight_state_t *fs) {
 	// main ejection algorithm
 	// can be used as an interface to another file
-	runAltitudeMeasurements(HAL_GetTick(), data->altitude);
-	check_ejection_state();
-	*fs = ej_fs;
+
+	// FOR DEBUGGING AND DEVELOPMENT ONLY!! verify we are running on new data
+	if (prevTick == hil_if_get_timestamp_ms()) {
+		*fs = ej_fs;
+		return;
+	}
+	else {
+		uint32_t currTick = hil_if_get_timestamp_ms();
+		ej_runAltitudeMeasurements(currTick, hil_if_get_altitude_m());
+		ej_check_state();
+		*fs = ej_fs;
+		prevTick = currTick;
+	}
 }
 
 
@@ -65,21 +73,18 @@ void ej_update_flight_state(struct ej_data *data, flight_state_t *fs) {
 void storeAltitude(float new_altitude, float cTime);
 
 // Public function implementation
-float runAltitudeMeasurements(uint32_t currTick, float currAlt) {
+void ej_runAltitudeMeasurements(uint32_t currTick, float currAlt) {
   T = (float)(currTick - prevTick);
 
   prevTick = currTick;
   float alt_meas = currAlt - alt_ground; // Measures AGL altitude in feet
-  float alt_filtered = alt_meas; // disable filtering for now
-  storeAltitude(alt_filtered, currTick);
-  alt_current = currAlt;
-  return alt_filtered;
+  storeAltitude(alt_meas, currTick);
+  alt_current = alt_meas;
 }
 
 // -- Private function implementation --
 
 void storeAltitude(float new_altitude, float cTime) {
-
 	alt_previous[currElem] = new_altitude;
 	time_previous[currElem] = cTime;
 	timalt_previous[currElem] = cTime * new_altitude;
@@ -108,7 +113,7 @@ float LSLinRegression() {
 }
 
 // logic to change states of flight -- from megaloop 2022
-void check_ejection_state(void) {
+void ej_check_state(void) {
 	switch (ej_fs) {
 	case PAD:
 

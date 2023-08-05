@@ -40,7 +40,7 @@ class Settings:
     # RKT_MAIN_AREA = 0
     
     # simulation parameters
-    USE_HARDWARE_TARGET = False
+    USE_HARDWARE_TARGET = True
     SIMULATION_TIMESTEP_MS = 10
     HARDWARE_UPDATE_TIMESTEP_MS = 10 * SIMULATION_TIMESTEP_MS
     PRINT_UPDATE_TIMESTEP_MS = 10 * SIMULATION_TIMESTEP_MS # frequency of printing to console
