@@ -41,6 +41,8 @@ class Simulation:
         self.time = 0
         self.launch_time = 0
         self.launched = False
+        self.sim_landed = False # sim may land before hardware detects it
+        self.sim_landed_time = 0
         self.sim_flight_state = utils.FLIGHT_STATES.PAD
         
         # rocket states
@@ -99,7 +101,6 @@ class Simulation:
             # account for drogue parachute drag, assume only in z direction for now
             force_drogue = rkt.drogue_drag_coeff * utils.Settings.AIR_MASS_DENSITY * (self.rkt_vel_z ** 2) * rkt.drogue_area_m2 / 2
             force_z = force_drogue - rocket_weight
-            print('drogue : f_p = %.3f\tf_z = %.3f\trw = %.3f' % (force_drogue, force_z, rocket_weight))
         
         elif self.sim_flight_state == utils.FLIGHT_STATES.MAIN_DESCENT:
             force_x = 0
@@ -109,8 +110,6 @@ class Simulation:
             
             if self.rkt_pos_z <= utils.Settings.GROUND_ALTITUDE_M:
                 force_z = 0
-            
-            print('main : f_p = %.3f\tf_z = %.3f\trw = %.3f' % (force_main, force_z, rocket_weight))
         
         elif self.sim_flight_state == utils.FLIGHT_STATES.LANDED:
             # nothing to do
@@ -262,7 +261,7 @@ def main():
     hw = hardware_interface.Hardware_Interface(ser, sim.sim_flight_state, use_hw_target=utils.Settings.USE_HARDWARE_TARGET)
 
     # start simulation
-    while sim.sim_flight_state != utils.FLIGHT_STATES.LANDED:
+    while sim.rkt_flight_state != utils.FLIGHT_STATES.LANDED:
         start_time_ns = time.time_ns()
         
         sim.simulate_tick(rkt)
@@ -283,17 +282,24 @@ def main():
             
             sim.rkt_flight_state = hw_flight_state
             if (hw_flight_state == utils.FLIGHT_STATES.DROGUE_DESCENT 
-                    or hw_flight_state == utils.FLIGHT_STATES.MAIN_DESCENT 
-                    or hw_flight_state == utils.FLIGHT_STATES.LANDED):
-                sim.sim_flight_state = hw_flight_state  
+                    or hw_flight_state == utils.FLIGHT_STATES.MAIN_DESCENT):
+                # simulation in these states depends on the FC's control, so must match sim state to rocket state
+                if sim.rkt_acc_z != 0 and sim.rkt_vel_z != 0: # simulated rocket is still moving
+                    sim.sim_flight_state = hw_flight_state
+                else:
+                    # simulated rocket has landed, start countdown window for hardware to detect landing
+                    sim.sim_flight_state = utils.FLIGHT_STATES.LANDED
+                    if sim.sim_landed == False:
+                        sim.sim_landed = True
+                        sim.sim_landed_time = sim.time
+                    if sim.time - sim.sim_landed_time > utils.Settings.SIMULATION_TIME_ALLOWED_FOR_HW_TO_DETECT_LANDING_MS:
+                        print('Hardware failed to detect landing within allowed simulation. Terminating simulation.')
+                        break
             
-        
         if (sim.time % utils.Settings.PRINT_UPDATE_TIMESTEP_MS == 0):
             # print('t = %d ms\tpos z = %.3f m\tsim state = %d\trkt state = %d' % (sim.time, sim.rkt_pos_z, sim.sim_flight_state.value, sim.rkt_flight_state.value))
             print(sim.datalog[-1].format_z() + '\tsimState = ' + str(sim.sim_flight_state.value))
 
-        # if hw_flight_state == utils.FLIGHT_STATES.BOOST and sim.flight_state == utils.FLIGHT_STATES.PAD:
-        #     sim.launch_time = sim.time # needed because thrust curve time starts at zero
         sim.increment_tick()
         
         # sleep time :)
@@ -304,7 +310,7 @@ def main():
                 time.sleep(sleep_time_ns / 100000000000) # sleep argument is in seconds
     
     # save data to file (todo)
-    # sim.save_sim_log_to_file()
+    sim.save_sim_log_to_file()
     
     # plot results
     sim.plot_simulation_results()
