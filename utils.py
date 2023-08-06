@@ -24,7 +24,7 @@ class Settings:
     PACKET_TRAILER = 0x0000FFFF # 32-bit value
 
     # rocket parameters for simulation
-    RKT_MASS_KG = 60
+    RKT_MASS_KG = 60 # porthos is 56.3 kg
     RKT_DROGUE_DRAG_COEFF = 1.5 # porthos drogue
     RKT_DROGUE_AREA = 3.14 * (1.21 ** 2)
     RKT_MAIN_DRAG_COEFF = 2.2 # porthos main

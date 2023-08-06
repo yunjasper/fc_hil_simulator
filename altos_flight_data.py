@@ -29,6 +29,8 @@ class AltOS_Flight_Data:
     # data_filename = "flight_data/2020-08-08-serial-4411-flight-0002.csv"
     # data_filename = "flight_data/2020-09-05-serial-4967-flight-0002.csv"
     data_filename = "flight_data/2020-10-10-serial-2378-flight-0021.csv" # supersonic with mach dip
+    DEFAULT_DATA_COLUMNS = ['time', 'accel_x', 'accel_y', 'accel_z', 'pressure']
+    ALTOS_FLIGHT_DATA_TIMESTEP_MS = 10
 
     # column names of flight data exported from Altus Metrum. flight data may not have every column.
     # units unclear, may be metric
@@ -62,7 +64,14 @@ class AltOS_Flight_Data:
         'gps_altitude' : 'altitude' # gps altitude, might have problems with duplicates
     }
 
-    def import_flight_data(self, filename, requested_column_names) -> pd.DataFrame:
+    def __init__(self, filename=data_filename, requested_column_names=DEFAULT_DATA_COLUMNS):
+            self.available_data_types = requested_column_names # TODO: make more resistant to errors, e.g. requested column names not available in specified file
+            self.data_initial_timestamp = 0
+            self.data_index_last_accessed = 0 # time is monotonically increasing. to accelerate data access, track the last accessed data index
+
+            self.data_df, self.apogee_index = self.get_flight_data(filename, requested_column_names)
+
+    def import_flight_data(self, filename, requested_column_names=DEFAULT_DATA_COLUMNS) -> pd.DataFrame:
         # verify data names are ok while grabbing the column names from the dictionary
         file_column_names = []
         for name in requested_column_names:
@@ -90,15 +99,20 @@ class AltOS_Flight_Data:
             except:
                 print(f'Error: Desired column ({str(col)}) is not in the file.')
         data.columns = requested_column_names
+
+        # unit conversion
+        # time in altos flight data is in seconds, simulation runs on ms
+        data['time'] = data['time'] * 1000
+        self.data_initial_timestamp = data['time'][0]
         return data
 
-    def extract_boost_coast_phase_data(self, data : pd.DataFrame) -> int:
+    def extract_apogee_index(self, data : pd.DataFrame) -> int:
         altitude = data['altitude']
         # find index of apogee -- TODO: may require more robust searching
         apogee_index = altitude.argmax(axis=0)
         return apogee_index
 
-    def get_flight_data(self, filename, data_column_names):
+    def get_flight_data(self, filename, data_column_names=DEFAULT_DATA_COLUMNS):
         """
         returns dataframe containing desired data and index of apogee
         or empty dataframe if error occurs (bad filename, desired data not present, etc.)
@@ -107,8 +121,39 @@ class AltOS_Flight_Data:
         if data.empty:
             apogee_index = 0
         else:
-            apogee_index = self.extract_boost_coast_phase_data(data)
+            apogee_index = self.extract_apogee_index(data)
         return data, apogee_index
+
+    def get_datapoint(self, sim_time_ms):
+        """
+        returns the data at the time specified in ms. if time is not available, use linear interpolation.
+        for sim_time_ms, t = 0 should correspond to launch
+
+        TODO: implement bounds-checking?
+        """
+        requested_time = self.data_initial_timestamp + sim_time_ms
+        data_time = self.data_df['time']
+        while data_time[self.data_index_last_accessed] > requested_time:
+            # if data_time[index_last_accessed] == requested_time --> index_last_accessed does not change
+            # if data_time[index_last_accessed] < requested_time and data_time[index_last_accessed] > requested_time --> requested time is between points, interpolate, index does not change
+            self.data_index_last_accessed += 1
+        
+        sample_data = [sim_time_ms] # contains list of data to be returned. order is same as that of the list passed in constructor
+        time1 = data_time[self.data_index_last_accessed]
+        time2 = data_time[self.data_index_last_accessed + 1]
+        for data_type in self.available_data_types:
+            if data_type == 'time':
+                continue # skip
+            # get data
+            data1 = self.data_df[data_type][self.data_index_last_accessed]
+            data2 = self.data_df[data_type][self.data_index_last_accessed + 1]
+            
+            # linear interpolation
+            data_x = (data2 - data1) / (time2 - time1) * (requested_time - time1) + data1
+            sample_data.append(data_x)
+        
+        return sample_data
+
 
 def main():
     # change folder to the folder where this file is saved
@@ -117,9 +162,9 @@ def main():
     os.chdir(dname)
 
     afd = AltOS_Flight_Data()
-    cols = ['time', 'accel_x', 'accel_y', 'accel_z', 'pressure']
-    data, apogee_index = afd.get_flight_data(afd.data_filename, cols)
-    a = 1
+    for i in range(200):
+        datapoint = afd.get_datapoint(i)
+
 
 if __name__ == '__main__':
     main()
