@@ -39,8 +39,13 @@ class Settings:
     # RKT_MAIN_DRAG_COEFF = 0
     # RKT_MAIN_AREA = 0
     
+    # Altus Metrum (AltOS) flight data usage configuration
+    USE_ALTOS_FLIGHT_DATA = False
+    ALTOS_FLIGHT_DATA_FILENAME = 'flight_data/2020-10-10-serial-2378-flight-0021.csv'
+    ALTOS_FLIGHT_DATA_TYPES = ['time', 'accel_x', 'accel_y', 'accel_z', 'pressure']
+
     # simulation parameters
-    USE_HARDWARE_TARGET = True
+    USE_HARDWARE_TARGET = False
     SIMULATION_TIMESTEP_MS = 10
     HARDWARE_UPDATE_TIMESTEP_MS = 10 * SIMULATION_TIMESTEP_MS
     PRINT_UPDATE_TIMESTEP_MS = 10 * SIMULATION_TIMESTEP_MS # frequency of printing to console

@@ -50,7 +50,7 @@ class Flight_Computer:
         #     self.update_altitude_array(self.altitude)
 
         # for struct format:
-        header, accX, accZ, altitude, trailer = struct.unpack('LfffL', telemetry)
+        header, time, accX, accZ, altitude, trailer = struct.unpack('LffffL', telemetry)
         if header != utils.Settings.PACKET_HEADER or trailer != utils.Settings.PACKET_TRAILER:
             print('Error: FC Mock - could not parse telemetry')
         else:

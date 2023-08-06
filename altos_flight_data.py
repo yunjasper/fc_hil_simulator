@@ -48,9 +48,9 @@ class AltOS_Flight_Data:
         'drogue_voltage' : 'drogue_voltage',
         'main_voltage' : 'main_voltage',
         'battery_voltage' : 'battery_voltage',
-        'accel_x' : 'accel_x',
+        'accel_x' : 'accel_z',
         'accel_y' : 'accel_y',
-        'accel_z' : 'accel_z',
+        'accel_z' : 'accel_x',
         'gyro_roll' : 'gyro_roll',
         'gyro_pitch' : 'gyro_pitch',
         'gyro_yaw' : 'gyro_yaw',
@@ -138,7 +138,7 @@ class AltOS_Flight_Data:
             # if data_time[index_last_accessed] < requested_time and data_time[index_last_accessed] > requested_time --> requested time is between points, interpolate, index does not change
             self.data_index_last_accessed += 1
         
-        sample_data = [sim_time_ms] # contains list of data to be returned. order is same as that of the list passed in constructor
+        sample_data = {'time' : sim_time_ms} # data to be returned
         time1 = data_time[self.data_index_last_accessed]
         time2 = data_time[self.data_index_last_accessed + 1]
         for data_type in self.available_data_types:
@@ -149,8 +149,8 @@ class AltOS_Flight_Data:
             data2 = self.data_df[data_type][self.data_index_last_accessed + 1]
             
             # linear interpolation
-            data_x = (data2 - data1) / (time2 - time1) * (requested_time - time1) + data1
-            sample_data.append(data_x)
+            data_interp = (data2 - data1) / (time2 - time1) * (requested_time - time1) + data1
+            sample_data.update({data_type : data_interp})
         
         return sample_data
 

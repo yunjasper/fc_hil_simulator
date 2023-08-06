@@ -16,6 +16,7 @@ import serial
 import time
 
 # "local" project libraries
+import altos_flight_data as aosfd
 import hardware_interface
 import rocket
 import utils
@@ -99,7 +100,6 @@ class Simulation:
             force_x = 0
             # account for drogue parachute drag, assume only in z direction for now
             air_mass_density = ambiance.Atmosphere(self.rkt_pos_z).density[0]
-            # air_mass_density = utils.Settings.AIR_MASS_DENSITY
             force_drogue = rkt.drogue_drag_coeff * air_mass_density * (self.rkt_vel_z ** 2) * rkt.drogue_area_m2 / 2
             force_z = force_drogue - rocket_weight
         
@@ -107,10 +107,10 @@ class Simulation:
             force_x = 0
             # account for main parachute drag, assume only in z direction for now
             air_mass_density = ambiance.Atmosphere(self.rkt_pos_z).density[0]
-            # air_mass_density = utils.Settings.AIR_MASS_DENSITY
             force_main = rkt.main_drag_coeff * air_mass_density * (self.rkt_vel_z ** 2) * rkt.main_area_m2 / 2
             force_z = force_main - rocket_weight
-            
+        
+            # rocket hits the ground
             if self.rkt_pos_z <= utils.Settings.GROUND_ALTITUDE_M:
                 force_z = 0
         
@@ -118,17 +118,20 @@ class Simulation:
             # nothing to do
             force_x = 0
             force_z = 0
+        
+        self.update_kinematics(rkt, force_x, force_z)
 
-        if force_z <= 0 and self.rkt_pos_z <= utils.Settings.GROUND_ALTITUDE_M: # can't go down, only up
-            # rocket is not moving
+    def update_kinematics(self, rocket : rocket.Rocket, force_x, force_z):
+        if force_z <= 0 and self.rkt_pos_z <= utils.Settings.GROUND_ALTITUDE_M:
+            # cannot go below ground so rocket is not moving
             self.rkt_acc_z = 0
             self.rkt_acc_x = 0
             self.rkt_vel_z = 0
             self.rkt_vel_x = 0
         else:
             # calculate resultant accelerations (F = m*a)
-            self.rkt_acc_x = force_x / rkt.dry_mass_kg
-            self.rkt_acc_z = force_z / rkt.dry_mass_kg
+            self.rkt_acc_x = force_x / rocket.dry_mass_kg
+            self.rkt_acc_z = force_z / rocket.dry_mass_kg
         
         # integrate to get velocities and positions
         self.rkt_vel_x += self.rkt_acc_x * self.timestep_ms / 1000
@@ -265,13 +268,26 @@ def main():
 
     hw = hardware_interface.Hardware_Interface(ser, sim.sim_flight_state, use_hw_target=utils.Settings.USE_HARDWARE_TARGET)
 
+    if utils.Settings.USE_ALTOS_FLIGHT_DATA == True:
+        afd = aosfd.AltOS_Flight_Data(filename=utils.Settings.ALTOS_FLIGHT_DATA_FILENAME, 
+                                      requested_column_names=utils.Settings.ALTOS_FLIGHT_DATA_TYPES)
+
     # start simulation
     # log initial conditions as a datapoint
     sim.log_datapoint()
     while sim.rkt_flight_state != utils.FLIGHT_STATES.LANDED:
         start_time_ns = time.time_ns()
         
-        sim.simulate_tick(rkt)
+        # select which data source to use: sim engine or altus metrum flight data
+        if utils.Settings.USE_ALTOS_FLIGHT_DATA == True and afd.data_index_last_accessed <= afd.apogee_index:
+            data = afd.get_datapoint(sim.time - sim.launch_time)
+            # TODO: determine how to automatically update simulation variables
+            sim.rkt_acc_x = data.get('accel_x')
+            sim.rkt_acc_z = data.get('accel_z')
+            sim.update_kinematics()
+        else:
+            sim.simulate_tick(rkt)
+        
         if (sim.time % utils.Settings.HARDWARE_UPDATE_TIMESTEP_MS == 0):
             # send data to controller
             hw.send(sim.datalog[-1])
