@@ -284,7 +284,8 @@ def main():
             # TODO: determine how to automatically update simulation variables
             sim.rkt_acc_x = data.get('accel_x')
             sim.rkt_acc_z = data.get('accel_z')
-            sim.update_kinematics()
+            sim.rkt_pos_z = data.get('altitude')
+            sim.update_kinematics(rkt, sim.rkt_acc_x * rkt.dry_mass_kg, sim.rkt_acc_z * rkt.dry_mass_kg)
         else:
             sim.simulate_tick(rkt)
         

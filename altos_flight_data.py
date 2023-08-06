@@ -10,6 +10,7 @@ author: jasper yun
 import numpy as np
 import os
 import pandas as pd
+import utils
 
 class AltOS_Flight_Data:
 
@@ -103,6 +104,13 @@ class AltOS_Flight_Data:
         # unit conversion
         # time in altos flight data is in seconds, simulation runs on ms
         data['time'] = data['time'] * 1000
+
+        # altos flight data accel_z data is from accelerometer, so positive and offset by gravity
+        if 'accel_z' in requested_column_names:
+            if data['accel_z'][0] > 0:
+                data['accel_z'] = data['accel_z'] -  utils.Settings.GRAVITY
+            else:
+                data['accel_z'] = -1 * data['accel_z'] - utils.Settings.GRAVITY
         self.data_initial_timestamp = data['time'][0]
         return data
 
@@ -133,7 +141,7 @@ class AltOS_Flight_Data:
         """
         requested_time = self.data_initial_timestamp + sim_time_ms
         data_time = self.data_df['time']
-        while data_time[self.data_index_last_accessed] > requested_time:
+        while data_time[self.data_index_last_accessed] < requested_time:
             # if data_time[index_last_accessed] == requested_time --> index_last_accessed does not change
             # if data_time[index_last_accessed] < requested_time and data_time[index_last_accessed] > requested_time --> requested time is between points, interpolate, index does not change
             self.data_index_last_accessed += 1
@@ -141,6 +149,8 @@ class AltOS_Flight_Data:
         sample_data = {'time' : sim_time_ms} # data to be returned
         time1 = data_time[self.data_index_last_accessed]
         time2 = data_time[self.data_index_last_accessed + 1]
+        if time1 == time2:
+            time2 += self.ALTOS_FLIGHT_DATA_TIMESTEP_MS
         for data_type in self.available_data_types:
             if data_type == 'time':
                 continue # skip
