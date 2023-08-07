@@ -56,7 +56,7 @@ class Simulation:
         self.rkt_flight_state = utils.FLIGHT_STATES.PAD
 
         self.datalog = [] # list of utils.Sim_DataPoint objects
-        self.datatable = None # datalog to be converted into pandas DataFrame in this variable after sim ends
+        self.datatable = pd.DataFrame(columns=self.data_column_names) # empty, to be filled in after sim ends
         
         base_filename = utils.Settings.SIMULATION_LOG_FILENAME_FORMAT + time.strftime('%Y-%m-%d_%H-%M-%S')
         self.session_folder = base_filename # folder name where outputs will be saved
@@ -69,6 +69,14 @@ class Simulation:
         self.time += self.timestep_ms
 
     def simulate_tick(self, rkt : rocket):
+
+        def get_thrust(rkt : rocket, time_ms):
+            if (self.time - self.launch_time) / 1000 < rkt.tc_burn_time:
+                thrust = rkt.get_thrust_N((self.time - self.launch_time) / 1000)
+            else:
+                thrust = 0
+            return thrust
+
         # variables for forces
         force_x = 0
         force_z = 0
@@ -82,33 +90,35 @@ class Simulation:
             force_z = 0
         
         elif self.sim_flight_state == utils.FLIGHT_STATES.BOOST:
-            # get thrust at this time
-            if (self.time - self.launch_time) / 1000 < rkt.tc_burn_time:
-                thrust = rkt.get_thrust_N((self.time - self.launch_time) / 1000)
-            else:
-                thrust = 0
+            thrust = get_thrust(rkt, self.time)
             # calculate forces
             la_rad = rkt.launch_angle_deg * np.pi / 180
             force_x = np.cos(la_rad) * thrust
             force_z = np.sin(la_rad) * thrust - rocket_weight
         
         elif self.sim_flight_state == utils.FLIGHT_STATES.COAST:
+            # in off-nominal cases, motor may still be burning while hardware detected a different flight state
+            thrust = get_thrust(rkt, self.time)
             force_x = 0
-            force_z = -1 * rocket_weight
+            force_z = thrust - rocket_weight
 
         elif self.sim_flight_state == utils.FLIGHT_STATES.DROGUE_DESCENT:
             force_x = 0
-            # account for drogue parachute drag, assume only in z direction for now
+            # in off-nominal cases, motor may still be burning while hardware detected a different flight state
+            thrust = get_thrust(rkt, self.time)
+            # account for parachute drag, assume only in z direction for now. parachute drag force acts opposite to direction of motion
             air_mass_density = ambiance.Atmosphere(self.rkt_pos_z).density[0]
             force_drogue = rkt.drogue_drag_coeff * air_mass_density * (self.rkt_vel_z ** 2) * rkt.drogue_area_m2 / 2
-            force_z = force_drogue - rocket_weight
+            force_z = thrust + (-1 * np.sign(self.rkt_vel_z) * force_drogue) - rocket_weight
         
         elif self.sim_flight_state == utils.FLIGHT_STATES.MAIN_DESCENT:
             force_x = 0
-            # account for main parachute drag, assume only in z direction for now
+            # in off-nominal cases, motor may still be burning while hardware detected a different flight state
+            thrust = get_thrust(rkt, self.time)
+            # account for parachute drag, assume only in z direction for now. parachute drag force acts opposite to direction of motion
             air_mass_density = ambiance.Atmosphere(self.rkt_pos_z).density[0]
             force_main = rkt.main_drag_coeff * air_mass_density * (self.rkt_vel_z ** 2) * rkt.main_area_m2 / 2
-            force_z = force_main - rocket_weight
+            force_z = thrust + (-1 * np.sign(self.rkt_vel_z) * force_main) - rocket_weight
         
             # rocket hits the ground
             if self.rkt_pos_z <= utils.Settings.GROUND_ALTITUDE_M:
@@ -179,9 +189,7 @@ class Simulation:
         f.close()
         os.chdir(os.pardir)
 
-    def plot_simulation_results(self):
-        self.convert_log_to_df(stride=utils.Settings.DATA_SAVE_STRIDE_PLOT)
-
+    def get_state_changes(self):
         # find state change time indices
         states = self.datatable['flight state']
         state_change_indices = []
@@ -190,6 +198,16 @@ class Simulation:
             if states[i] != previous_state:
                 state_change_indices.append(i)
                 previous_state = states[i]
+        if self.datalog[-1].rkt_flight_state == utils.FLIGHT_STATES.LANDED:
+            # sim ends immediately upon landing detection, so landing detection must
+            # be the last data point in the table
+            state_change_indices.append(self.datatable.shape[0] - 1)
+
+        return state_change_indices
+
+    def plot_simulation_results(self):
+        self.convert_log_to_df(stride=utils.Settings.DATA_SAVE_STRIDE_PLOT)
+        state_change_indices = self.get_state_changes()
         
         plt.rc('lines', linewidth=2)
         plt.rc('axes', grid=True)
@@ -200,8 +218,8 @@ class Simulation:
         axX[0].plot(time_values_s, self.datatable['position x (m)'])
         for idx in state_change_indices:
             axX[0].axvline(time_values_s[idx], color='red')
-        if self.datalog[-1].rkt_flight_state == utils.FLIGHT_STATES.LANDED:
-            axX[0].axvline(time_values_s[len(time_values_s) - 1], color='red')
+        # if self.datalog[-1].rkt_flight_state == utils.FLIGHT_STATES.LANDED:
+        #     axX[0].axvline(time_values_s[len(time_values_s) - 1], color='red')
         axX[0].set_ylabel('position x (m)')
         axX[1].plot(time_values_s, self.datatable['velocity x (m/s)'])
         axX[1].set_ylabel('velocity x (m/s)')
@@ -215,8 +233,8 @@ class Simulation:
         axZ[0].legend(['noisy', 'true'])
         for idx in state_change_indices:
             axZ[0].axvline(time_values_s[idx], color='red')
-        if self.datalog[-1].rkt_flight_state == utils.FLIGHT_STATES.LANDED:
-            axZ[0].axvline(time_values_s[len(time_values_s) - 1], color='red')
+        # if self.datalog[-1].rkt_flight_state == utils.FLIGHT_STATES.LANDED:
+        #     axZ[0].axvline(time_values_s[len(time_values_s) - 1], color='red')
         axZ[0].set_ylabel('position z (m)')
         axZ[1].plot(time_values_s, self.datatable['velocity z (m/s)'])
         axZ[1].set_ylabel('velocity z (m/s)')
@@ -231,6 +249,62 @@ class Simulation:
         figZ.savefig(self.session_folder + '_z_axis_plots.png', dpi=300)
         os.chdir(os.pardir)
         plt.show()
+
+    def analyze_sim_results(self):
+        # want to know:
+        #   - altitude of all state changes
+        #   - time + altitude at ejection vs true apogee (shows lead/lag of algorithm)
+        if self.datatable.empty:
+            self.convert_log_to_df(stride=utils.Settings.DATA_SAVE_STRIDE_LOG)
+        state_change_indices = self.get_state_changes()
+        # get true apogee
+        apogee_index = np.argmax(self.datatable['position z (m)'], axis=0)
+        altitude_apogee = self.datatable['position z (m)'][apogee_index]
+        time_apogee = self.datatable['time (ms)'][apogee_index]
+
+        # get ejection stats
+        ej_idx = 0
+        for idx in state_change_indices:
+            if self.datatable['flight state'][idx] == utils.FLIGHT_STATES.DROGUE_DESCENT.name:
+                ej_idx = idx
+                break
+        altitude_ej = self.datatable['position z (m)'][ej_idx]
+        time_ej = self.datatable['time (ms)'][ej_idx]
+        
+        os.chdir(self.session_folder)
+        with open(self.session_folder + '_analysis.txt', 'w') as f:    
+            f.write('Analysis of session:\n')
+            print('Analysis of session:')
+            for i in range(len(state_change_indices)):
+                idx = state_change_indices[i]
+                data_str = self.datalog[idx].format_all()
+                print(f'State change {i}: ' + data_str)
+                f.write(f'State change {i}: ' + data_str + '\n')
+            f.write('\n')
+
+            # print stats
+            apogee_str = 'True apogee:\ttime (ms) = %.3f\taltitude (m) = %.3f' % (time_apogee, altitude_apogee)
+            ej_str =     'Ejection:   \ttime (ms) = %.3f\taltitude (m) = %.3f' % (time_ej, altitude_ej)
+            diff_str =   'Difference: \ttime (ms) = %.3f\taltitude (m) = %.3f' % (time_apogee - time_ej, altitude_apogee - altitude_ej)
+            if time_apogee > time_ej:
+                info_str = 'PREMATURE EJECTION by %.3f seconds' % ((time_apogee - time_ej) / 1000)
+            elif time_apogee == time_ej:
+                info_str = 'Ejection exactly on time, congratulations!'
+            else:
+                info_str = 'LATE EJECTION by %.3f seconds' % ((time_ej - time_apogee) / 1000)
+            
+            print(apogee_str)
+            print(ej_str)
+            print(diff_str)
+            print(info_str)
+            f.write(apogee_str + '\n')
+            f.write(ej_str + '\n')
+            f.write(diff_str + '\n')
+            f.write(info_str + '\n')
+
+            os.chdir(os.pardir)
+
+
 
 # todo: move this (and the SERIAL_PORT config settings) into hardware_interface
 def open_COM_port() -> serial.Serial:
@@ -319,9 +393,18 @@ def main():
                         print('Hardware failed to detect landing within allowed simulation. Terminating simulation.')
                         break
             
+            # test simulation behavior with CATO due to early ejection (only testable with software mock FC)
+            if utils.Settings.TEST_EARLY_EJECTION_CATO and utils.Settings.USE_HARDWARE_TARGET == False:
+                if sim.rkt_pos_z > utils.Settings.EJECTION_CATO_ALTITUDE_M:
+                    sim.sim_flight_state = utils.FLIGHT_STATES.DROGUE_DESCENT
+                    # override mock FC's state
+                    sim.rkt_flight_state = utils.FLIGHT_STATES.DROGUE_DESCENT
+                    hw.mock_fc.flight_state = utils.FLIGHT_STATES.DROGUE_DESCENT
+                    hw.flight_state = utils.FLIGHT_STATES.DROGUE_DESCENT
+
         if (sim.time % utils.Settings.PRINT_UPDATE_TIMESTEP_MS == 0):
             # print('t = %d ms\tpos z = %.3f m\tsim state = %d\trkt state = %d' % (sim.time, sim.rkt_pos_z, sim.sim_flight_state.value, sim.rkt_flight_state.value))
-            print(sim.datalog[-1].format_z() + '\tsimState = ' + str(sim.sim_flight_state.value))
+            print(sim.datalog[-1].format_z() + ', simState = ' + str(sim.sim_flight_state.value))
 
         sim.log_datapoint()
         sim.increment_tick()
@@ -333,9 +416,13 @@ def main():
             if sleep_time_ns > 0:
                 time.sleep(sleep_time_ns / 100000000000) # sleep argument is in seconds
     
+    if utils.Settings.USE_HARDWARE_TARGET == True:
+        hw.com_port.close()
+    
     # final datapoint after exiting simulation
     sim.log_datapoint()
-    sim.save_sim_log_to_file()
+    sim.analyze_sim_results()
+    # sim.save_sim_log_to_file()
     sim.plot_simulation_results()
     
 
