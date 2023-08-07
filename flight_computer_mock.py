@@ -6,6 +6,7 @@ runs the flight computer ejection algorithm in Python while debugging the simula
 author: jasper yun
 """
 
+import ambiance
 import numpy as np
 from scipy import stats # for linear regression
 import struct
@@ -54,6 +55,10 @@ class Flight_Computer:
         if header != utils.Settings.PACKET_HEADER or trailer != utils.Settings.PACKET_TRAILER:
             print('Error: FC Mock - could not parse telemetry')
         else:
+            if utils.Settings.SEND_ALTITUDE_INSTEAD_OF_PRESSURE == False:
+                # 'altitude' contains pressure (hPa) data, convert to altitude (m)
+                altitude = ambiance.Atmosphere.from_pressure(altitude * 100).h[0]
+            
             self.accX = accX
             self.accY = 0
             self.accZ = accZ

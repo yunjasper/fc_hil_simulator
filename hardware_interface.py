@@ -18,7 +18,7 @@ import serial
 import struct
 import utils
 
-def altitude2pressure(altitude_m):
+def altitude2pressure_hPa(altitude_m):
         """returns barometric pressure (hPa) corresponding to the given altitude (m)"""
         return ambiance.Atmosphere(altitude_m).pressure[0] / 100
 
@@ -37,13 +37,21 @@ class Hardware_Interface:
             self.mock_fc = fc.Flight_Computer()
 
     def send(self, data : utils.Sim_DataPoint):
-        # convert altitude (position in z axis) to barometric pressure
-        altitude = data.rkt_pos_z
-        pressure = altitude2pressure(altitude)
+        if utils.Settings.USE_NOISY_ALTITUDE:
+            altitude = data.rkt_pos_z_noisy
+        else:
+            altitude = data.rkt_pos_z
+        pressure = altitude2pressure_hPa(altitude)
+        
+        if utils.Settings.SEND_ALTITUDE_INSTEAD_OF_PRESSURE == True:
+            baro_data = altitude
+        else:
+            baro_data = pressure
+        
         # send data as string
         # data_packet = 'S,%.8f,0.000,%.8f,%.8f,E\r\n' % (data.rkt_acc_x, data.rkt_acc_z, altitude)
         # send data as struct (more efficient use of bytes on the line)
-        data_packet = struct.pack('LLfffL', utils.Settings.PACKET_HEADER, int(data.time), data.rkt_acc_x, data.rkt_acc_z, altitude, utils.Settings.PACKET_TRAILER)
+        data_packet = struct.pack('LLfffL', utils.Settings.PACKET_HEADER, int(data.time), data.rkt_acc_x, data.rkt_acc_z, baro_data, utils.Settings.PACKET_TRAILER)
         if self.use_target_hw:
             self.com_port.write(data_packet)
         else:
