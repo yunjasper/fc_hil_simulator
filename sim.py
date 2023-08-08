@@ -422,7 +422,7 @@ def main():
     # final datapoint after exiting simulation
     sim.log_datapoint()
     sim.analyze_sim_results()
-    # sim.save_sim_log_to_file()
+    sim.save_sim_log_to_file()
     sim.plot_simulation_results()
     
 

@@ -37,6 +37,10 @@ class Hardware_Interface:
             self.mock_fc = fc.Flight_Computer()
 
     def send(self, data : utils.Sim_DataPoint):
+
+        
+
+
         if utils.Settings.USE_NOISY_ALTITUDE:
             altitude = data.rkt_pos_z_noisy
         else:
@@ -48,6 +52,9 @@ class Hardware_Interface:
         else:
             baro_data = pressure
         
+        if utils.Settings.SIMULATE_TRANSONIC_MACH_DIP == True:
+            
+
         # send data as string
         # data_packet = 'S,%.8f,0.000,%.8f,%.8f,E\r\n' % (data.rkt_acc_x, data.rkt_acc_z, altitude)
         # send data as struct (more efficient use of bytes on the line)

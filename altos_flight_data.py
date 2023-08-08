@@ -85,6 +85,10 @@ class AltOS_Flight_Data:
         if 'altitude' not in requested_column_names:
             requested_column_names.append('altitude')
             file_column_names.append(self.DATA_TYPES.get('altitude'))
+        
+        if 'pressure' not in requested_column_names:
+            requested_column_names.append('pressure')
+            file_column_names.append(self.DATA_TYPES.get('pressure'))
 
         try:
             df = pd.read_csv(filename)
@@ -105,7 +109,7 @@ class AltOS_Flight_Data:
         # time in altos flight data is in seconds, simulation runs on ms
         data['time'] = data['time'] * 1000
 
-        # altos flight data accel_z data is from accelerometer, so positive and offset by gravity
+        # altos flight data accel_z data is from accelerometer, so offset by gravity and sign ambiguous
         if 'accel_z' in requested_column_names:
             if data['accel_z'][0] > 0:
                 data['accel_z'] = data['accel_z'] -  utils.Settings.GRAVITY
