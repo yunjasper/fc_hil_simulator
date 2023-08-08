@@ -8,8 +8,10 @@ the mach dip will be emulated using a triangular piecewise linear curve for *alt
 upward/downward slopes specified. see parameters for descriptions. 
 
 parameters:
-    - MACH_DIP_UPWARD_SLOPE_HPA_PER_MPS         slope of the upward triangle segment in units of hPa per m/s
-    - MACH_DIP_DOWNARD_SLOPE_HPA_PER_MPS        slope of the downward triangle segment in units of hPa per m/s
+    - MACH_DIP_PASSING_UPWARD_SLOPE_HPA_PER_MPS         slope of the upward triangle segment in units of hPa per m/s when passing from below Mach 1 to above
+    - MACH_DIP_PASSING_DOWNARD_SLOPE_HPA_PER_MPS        slope of the downward triangle segment in units of hPa per m/s when passing from below Mach 1 to above
+    - MACH_DIP_DROPPING_UPWARD_SLOPE_HPA_PER_MPS         slope of the upward triangle segment in units of hPa per m/s when dropping from above Mach 1 to below
+    - MACH_DIP_DROPPING_DOWNARD_SLOPE_HPA_PER_MPS        slope of the downward triangle segment in units of hPa per m/s when dropping from above Mach 1 to below
     - MACH_DIP_MIDPOINT_FACTOR                  middle of the triangle occurs at speed of sound * MIDPOINT_FACTOR
     - MACH_DIP_WIDTH_FACTOR                     mach dip happens only while the rocket vertical velocity is between
                                                 (MIDPOINT - WIDTH/2, MIDPOINT + WIDTH/2)
@@ -23,12 +25,14 @@ import ambiance
 import numpy as np
 import utils
 
-MACH_DIP_UPWARD_SLOPE_HPA_PER_MPS = 25
-MACH_DIP_DOWNWARD_SLOPE_HPA_PER_MPS = -30
-MACH_DIP_MIDPOINT_FACTOR = 1.1
-MACH_DIP_WIDTH_FACTOR = 0.2
-MACH_DIP_PASSING_ENABLE = True
-MACH_DIP_DROPPING_ENABLE = False
+MACH_DIP_PASSING_UPWARD_SLOPE_HPA_PER_MPS = 25
+MACH_DIP_PASSING_DOWNWARD_SLOPE_HPA_PER_MPS = -150
+# MACH_DIP_DROPPING_UPWARD_SLOPE_HPA_PER_MPS = 10
+# MACH_DIP_DROPPING_DOWNWARD_SLOPE_HPA_PER_MPS = -25
+MACH_DIP_MIDPOINT_FACTOR = 1.2
+MACH_DIP_WIDTH_FACTOR = 0.3
+# MACH_DIP_PASSING_ENABLE = True
+# MACH_DIP_DROPPING_ENABLE = True
 
 # track altitudes of points inside the mach dip
 triangle_start_datapoint = None
@@ -52,25 +56,26 @@ def get_mach_dip_altitude(data : utils.Sim_DataPoint):
 
         base_pressure = ambiance.Atmosphere(triangle_start_datapoint.rkt_pos_z).pressure[0]
         # base_pressure = ambiance.Atmosphere(triangle_start_datapoint.rkt_pos_z).pressure[0]
-        if MACH_DIP_PASSING_ENABLE and data.rkt_acc_z > 0:
+        # if MACH_DIP_PASSING_ENABLE and data.rkt_acc_z > 0:
+        if data.rkt_acc_z > 0:
             # breaking sound barrier for first time, triangle shape is \/
             # pressure INCREASE corresponds to altitude DECREASE
             if data.rkt_vel_z < speed_of_sound_mps * MACH_DIP_MIDPOINT_FACTOR:
                 # \ part of the triangle
                 # adjustment is relative to first point of the triangle
-                pressure_adjustment = MACH_DIP_UPWARD_SLOPE_HPA_PER_MPS * np.abs(data.rkt_vel_z - triangle_start_datapoint.rkt_vel_z)
+                pressure_adjustment = MACH_DIP_PASSING_UPWARD_SLOPE_HPA_PER_MPS * np.abs(data.rkt_vel_z - triangle_start_datapoint.rkt_vel_z)
             else:
                 # / part of triangle
-                pressure_adjustment = MACH_DIP_DOWNWARD_SLOPE_HPA_PER_MPS * np.abs(data.rkt_vel_z - triangle_start_datapoint.rkt_vel_z)
+                pressure_adjustment = MACH_DIP_PASSING_DOWNWARD_SLOPE_HPA_PER_MPS * np.abs(data.rkt_vel_z - triangle_start_datapoint.rkt_vel_z)
             
-        elif MACH_DIP_DROPPING_ENABLE and data.rkt_acc_z < 0:
-            # triangle shape is /\
-            if data.rkt_vel_z > speed_of_sound_mps * MACH_DIP_MIDPOINT_FACTOR:
-                # / part of triangle
-                pressure_adjustment = MACH_DIP_DOWNWARD_SLOPE_HPA_PER_MPS * np.abs(data.rkt_vel_z - triangle_start_datapoint.rkt_vel_z)
-            else:
-                # \ part of triangle
-                pressure_adjustment = MACH_DIP_UPWARD_SLOPE_HPA_PER_MPS * np.abs(data.rkt_vel_z - triangle_start_datapoint.rkt_vel_z)
+        # elif MACH_DIP_DROPPING_ENABLE and data.rkt_acc_z < 0:
+        #     # triangle shape is /\
+        #     if data.rkt_vel_z > speed_of_sound_mps * MACH_DIP_MIDPOINT_FACTOR:
+        #         # / part of triangle
+        #         pressure_adjustment = MACH_DIP_DROPPING_DOWNWARD_SLOPE_HPA_PER_MPS * np.abs(data.rkt_vel_z - triangle_start_datapoint.rkt_vel_z)
+        #     else:
+        #         # \ part of triangle
+        #         pressure_adjustment = MACH_DIP_DROPPING_UPWARD_SLOPE_HPA_PER_MPS * np.abs(data.rkt_vel_z - triangle_start_datapoint.rkt_vel_z)
         else:
             pressure_adjustment = 0
         
