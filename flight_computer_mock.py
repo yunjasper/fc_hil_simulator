@@ -25,15 +25,17 @@ class Flight_Computer:
         # variables for the ejection algorithm
         self.EJ_MAIN_DEPLOYMENT = 1500 * 0.3048 # ft to m conversion
         self.EJ_LANDING_SAMPLES = 50
-        self.EJ_LANDING_THRESHOLD = 0.5
+        self.EJ_LANDING_THRESHOLD = 3
         self.EJ_LAUNCH_THRESHOLD = 50 
         self.EJ_NUM_MEAS_REG = 50
+        self.accZ_epsilon = 0.2
 
         # ring buffer
         self.alt_previous = self.EJ_NUM_MEAS_REG * [utils.Settings.GROUND_ALTITUDE_M]
         self.alt_previous_idx = 0
 
         self.update_iterations = 0 
+        self.landing_samples_count = 0
 
 
     def parse_telemetry(self, telemetry):
@@ -95,7 +97,9 @@ class Flight_Computer:
                 y_values.append(self.alt_previous[(self.alt_previous_idx + i) % self.EJ_NUM_MEAS_REG])
             result = stats.linregress(x_values, y_values)
             if result.slope < -0:
-                self.flight_state = utils.FLIGHT_STATES.DROGUE_DESCENT
+                # check acceleration
+                if  self.accZ > -1 * utils.Settings.GRAVITY - self.accZ_epsilon and self.accZ < -1 * utils.Settings.GRAVITY + self.accZ_epsilon:
+                    self.flight_state = utils.FLIGHT_STATES.DROGUE_DESCENT
         
         elif self.flight_state == utils.FLIGHT_STATES.DROGUE_DESCENT:
             current_altitude = self.alt_previous[(self.alt_previous_idx - 1) % self.EJ_NUM_MEAS_REG]
@@ -105,7 +109,9 @@ class Flight_Computer:
         elif self.flight_state == utils.FLIGHT_STATES.MAIN_DESCENT:
             min_alt = np.min(self.alt_previous)
             max_alt = np.max(self.alt_previous)
-            if max_alt - min_alt == 0:
+            if max_alt - min_alt < self.EJ_LANDING_THRESHOLD and np.abs(self.accZ) < self.accZ_epsilon and np.abs(self.altitude) <= utils.Settings.GROUND_ALTITUDE_M:
+                self.landing_samples_count += 1
+            if self.landing_samples_count > self.EJ_LANDING_SAMPLES:
                 self.flight_state = utils.FLIGHT_STATES.LANDED
 
     def update_sim_step(self, telemetry):

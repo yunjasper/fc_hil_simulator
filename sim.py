@@ -297,15 +297,19 @@ class Simulation:
             else:
                 info_str = 'LATE EJECTION by %.3f seconds' % ((time_ej - time_apogee) / 1000)
             
+            time_final = self.datatable['time (ms)'][len(self.datatable) - 1]
+            altitude_final = self.datatable['position z (m)'][len(self.datatable) - 1]
+            final_str =  'Final state:\ttime (ms) = %.3f\taltitude (m) = %.3f' % (time_final, altitude_final)
             print(apogee_str)
             print(ej_str)
             print(diff_str)
             print(info_str)
+            print(final_str)
             f.write(apogee_str + '\n')
             f.write(ej_str + '\n')
             f.write(diff_str + '\n')
             f.write(info_str + '\n')
-
+            f.write(final_str + '\n')
             os.chdir(os.pardir)
 
 
@@ -421,8 +425,8 @@ def main():
                 time.sleep(sleep_time_ns / 100000000000) # sleep argument is in seconds
     
         # for debugging only
-        if sim.time > 25000:
-            break
+        # if sim.time > 25000:
+        #     break
 
     if utils.Settings.USE_HARDWARE_TARGET == True:
         hw.com_port.close()
