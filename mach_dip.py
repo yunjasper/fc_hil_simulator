@@ -13,6 +13,8 @@ parameters:
     - MACH_DIP_MIDPOINT_FACTOR                  middle of the triangle occurs at speed of sound * MIDPOINT_FACTOR
     - MACH_DIP_WIDTH_FACTOR                     mach dip happens only while the rocket vertical velocity is between
                                                 (MIDPOINT - WIDTH/2, MIDPOINT + WIDTH/2)
+    - MACH_DIP_PASSING_ENABLE                   enable Mach dip emulation when passing from below Mach 1 to above
+    - MACH_DIP_DROPPING_ENABLE                  enable Mach dip emulation when dropping from above Mach 1 to below
 
 author: jasper yun
 """
@@ -21,10 +23,12 @@ import ambiance
 import numpy as np
 import utils
 
-MACH_DIP_UPWARD_SLOPE_HPA_PER_MPS = 2
-MACH_DIP_DOWNWARD_SLOPE_HPA_PER_MPS = -2
-MACH_DIP_MIDPOINT_FACTOR = 1.2
+MACH_DIP_UPWARD_SLOPE_HPA_PER_MPS = 25
+MACH_DIP_DOWNWARD_SLOPE_HPA_PER_MPS = -30
+MACH_DIP_MIDPOINT_FACTOR = 1.1
 MACH_DIP_WIDTH_FACTOR = 0.2
+MACH_DIP_PASSING_ENABLE = True
+MACH_DIP_DROPPING_ENABLE = False
 
 # track altitudes of points inside the mach dip
 triangle_start_datapoint = None
@@ -48,7 +52,7 @@ def get_mach_dip_altitude(data : utils.Sim_DataPoint):
 
         base_pressure = ambiance.Atmosphere(triangle_start_datapoint.rkt_pos_z).pressure[0]
         # base_pressure = ambiance.Atmosphere(triangle_start_datapoint.rkt_pos_z).pressure[0]
-        if data.rkt_acc_z > 0:
+        if MACH_DIP_PASSING_ENABLE and data.rkt_acc_z > 0:
             # breaking sound barrier for first time, triangle shape is \/
             # pressure INCREASE corresponds to altitude DECREASE
             if data.rkt_vel_z < speed_of_sound_mps * MACH_DIP_MIDPOINT_FACTOR:
@@ -59,7 +63,7 @@ def get_mach_dip_altitude(data : utils.Sim_DataPoint):
                 # / part of triangle
                 pressure_adjustment = MACH_DIP_DOWNWARD_SLOPE_HPA_PER_MPS * np.abs(data.rkt_vel_z - triangle_start_datapoint.rkt_vel_z)
             
-        else:
+        elif MACH_DIP_DROPPING_ENABLE and data.rkt_acc_z < 0:
             # triangle shape is /\
             if data.rkt_vel_z > speed_of_sound_mps * MACH_DIP_MIDPOINT_FACTOR:
                 # / part of triangle
@@ -67,16 +71,21 @@ def get_mach_dip_altitude(data : utils.Sim_DataPoint):
             else:
                 # \ part of triangle
                 pressure_adjustment = MACH_DIP_UPWARD_SLOPE_HPA_PER_MPS * np.abs(data.rkt_vel_z - triangle_start_datapoint.rkt_vel_z)
-
-        pressure = (base_pressure + pressure_adjustment)
-        altitude = ambiance.Atmosphere.from_pressure(pressure).h[0]
-        pressure /= 100 # hPa to be returned instead of Pa
+        else:
+            pressure_adjustment = 0
+        
+        if pressure_adjustment == 0:
+            altitude = data.rkt_pos_z
+        else:
+            pressure = (base_pressure + pressure_adjustment)
+            altitude = ambiance.Atmosphere.from_pressure(pressure).h[0]
+        # pressure /= 100 # hPa to be returned instead of Pa
             
     else:
         # do nothing
         triangle_start_datapoint = None
         altitude = data.rkt_pos_z
-        pressure = ambiance.Atmosphere(data.rkt_pos_z).pressure[0] / 100 # hPa instead of Pa
+        # pressure = ambiance.Atmosphere(data.rkt_pos_z).pressure[0] / 100 # hPa instead of Pa
     
     # return (pressure, altitude)
     return altitude

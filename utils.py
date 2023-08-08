@@ -24,25 +24,25 @@ class Settings:
     PACKET_TRAILER = 0x0000FFFF # 32-bit value
 
     # rocket parameters for simulation
-    RKT_MASS_KG = 60 # porthos is 56.3 kg
+    RKT_MASS_KG = 40 # porthos is 56.3 kg
     RKT_DROGUE_DRAG_COEFF = 1.5 # porthos drogue
     RKT_DROGUE_AREA = 3.14 * (1.21 ** 2)
     RKT_MAIN_DRAG_COEFF = 2.2 # porthos main
     RKT_MAIN_AREA = 3.14 * (3.66 ** 2)
     RKT_LAUNCH_ANGLE = 90
-    # RKT_THRUST_CURVE_FILE = 'Cesaroni_21062O3400-P.rse' # rse file -- filename relative to this file
-    RKT_THRUST_CURVE_FILE = 'Cesaroni_14263N3400-P.rse'
+    RKT_THRUST_CURVE_FILE = 'Cesaroni_21062O3400-P.rse' # rse file -- filename relative to this file
+    # RKT_THRUST_CURVE_FILE = 'Cesaroni_14263N3400-P.rse'
 
     # uncomment for test case with no parachutes. trajectory should be a perfect parabola
-    # RKT_DROGUE_DRAG_COEFF = 0
-    # RKT_DROGUE_AREA = 0
-    # RKT_MAIN_DRAG_COEFF = 0
-    # RKT_MAIN_AREA = 0
+    RKT_DROGUE_DRAG_COEFF = 0
+    RKT_DROGUE_AREA = 0
+    RKT_MAIN_DRAG_COEFF = 0
+    RKT_MAIN_AREA = 0
     TEST_EARLY_EJECTION_CATO = False # as of Aug 7, this feature does not fully work -- I think ejection occurs twice
     EJECTION_CATO_ALTITUDE_M = 1000 / 2
     
     # Altus Metrum (AltOS) flight data usage configuration
-    USE_ALTOS_FLIGHT_DATA = True
+    USE_ALTOS_FLIGHT_DATA = False
     ALTOS_FLIGHT_DATA_FILENAME = 'flight_data/2020-10-10-serial-2378-flight-0021.csv'
     ALTOS_FLIGHT_DATA_TYPES = ['time', 'accel_x', 'accel_y', 'accel_z', 'pressure']
 
@@ -54,7 +54,7 @@ class Settings:
 
     ALTITUDE_NOISE_MAX_AMPLITUDE_M = 3
     
-    SIMULATION_TIMESTEP_MS = 1
+    SIMULATION_TIMESTEP_MS = 10
     HARDWARE_UPDATE_TIMESTEP_MS = 1 * SIMULATION_TIMESTEP_MS
     PRINT_UPDATE_TIMESTEP_MS = 1 * SIMULATION_TIMESTEP_MS # frequency of printing to console
     SIMULATION_SW_TARGET_LAUNCH_TIME_MS = 100
