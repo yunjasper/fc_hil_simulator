@@ -100,7 +100,10 @@ class AltOS_Flight_Data:
         data = pd.DataFrame() # empty
         for col in file_column_names:
             try:
-                data[col] = df[col]
+                if col == 'altitude':
+                    data[col] = df[col] - df[col][0] # zero out ground altitude
+                else:
+                    data[col] = df[col]
             except:
                 print(f'Error: Desired column ({str(col)}) is not in the file.')
         data.columns = requested_column_names

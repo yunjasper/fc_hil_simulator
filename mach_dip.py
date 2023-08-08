@@ -4,7 +4,7 @@ mach_dip.py
 emulates a mach dip in the barometric pressure based on the vertical velocity of the rocket.
 *** this mach dip has no basis in transonic shockwave physics ***
 
-the mach dip will be emulated using a triangular piecewise linear curve with
+the mach dip will be emulated using a triangular piecewise linear curve for *altitude* with
 upward/downward slopes specified. see parameters for descriptions. 
 
 parameters:
@@ -21,21 +21,25 @@ import ambiance
 import numpy as np
 import utils
 
-MACH_DIP_UPWARD_SLOPE_HPA_PER_MPS = 150
-MACH_DIP_DOWNWARD_SLOPE_HPA_PER_MPS = -150
-MACH_DIP_MIDPOINT_FACTOR = 1.4
-MACH_DIP_WIDTH_FACTOR = 0.5
+MACH_DIP_UPWARD_SLOPE_HPA_PER_MPS = 2
+MACH_DIP_DOWNWARD_SLOPE_HPA_PER_MPS = -2
+MACH_DIP_MIDPOINT_FACTOR = 1.2
+MACH_DIP_WIDTH_FACTOR = 0.2
 
 # track altitudes of points inside the mach dip
 triangle_start_datapoint = None
 
-def get_mach_dip_pressure_altitude(data : utils.Sim_DataPoint):
+def get_mach_dip_altitude(data : utils.Sim_DataPoint):
     """
-    returns tuple of mach dip-adjusted (pressure_hPa, altitude_m)
+    returns mach dip-adjusted altitude_m
     """
     # check speed of sound based on true altitude
     global triangle_start_datapoint
-    speed_of_sound_mps = ambiance.Atmosphere(data.rkt_pos_z).speed_of_sound[0]
+    if utils.Settings.USE_NOISY_ALTITUDE == True:
+        speed_of_sound_mps = ambiance.Atmosphere(data.rkt_pos_z_noisy).speed_of_sound[0]
+    else:
+        speed_of_sound_mps = ambiance.Atmosphere(data.rkt_pos_z).speed_of_sound[0]
+
     if (data.rkt_vel_z > speed_of_sound_mps * (MACH_DIP_MIDPOINT_FACTOR - MACH_DIP_WIDTH_FACTOR / 2) 
         and data.rkt_vel_z < speed_of_sound_mps * (MACH_DIP_MIDPOINT_FACTOR + MACH_DIP_WIDTH_FACTOR / 2)):
         
@@ -43,6 +47,7 @@ def get_mach_dip_pressure_altitude(data : utils.Sim_DataPoint):
             triangle_start_datapoint = data
 
         base_pressure = ambiance.Atmosphere(triangle_start_datapoint.rkt_pos_z).pressure[0]
+        # base_pressure = ambiance.Atmosphere(triangle_start_datapoint.rkt_pos_z).pressure[0]
         if data.rkt_acc_z > 0:
             # breaking sound barrier for first time, triangle shape is \/
             # pressure INCREASE corresponds to altitude DECREASE
@@ -63,18 +68,20 @@ def get_mach_dip_pressure_altitude(data : utils.Sim_DataPoint):
                 # \ part of triangle
                 pressure_adjustment = MACH_DIP_UPWARD_SLOPE_HPA_PER_MPS * np.abs(data.rkt_vel_z - triangle_start_datapoint.rkt_vel_z)
 
-        pressure = base_pressure + pressure_adjustment
+        pressure = (base_pressure + pressure_adjustment)
         altitude = ambiance.Atmosphere.from_pressure(pressure).h[0]
+        pressure /= 100 # hPa to be returned instead of Pa
             
     else:
         # do nothing
         triangle_start_datapoint = None
         altitude = data.rkt_pos_z
-        pressure = ambiance.Atmosphere(data.rkt_pos_z).pressure[0]
+        pressure = ambiance.Atmosphere(data.rkt_pos_z).pressure[0] / 100 # hPa instead of Pa
     
-    return (pressure, altitude)
+    # return (pressure, altitude)
+    return altitude
 
-def main():
+def test():
     # generate array of test datapoints
     array_length = 100
     acc_z = ([1] * int(array_length / 2)) + ([-1] * int(array_length / 2))
@@ -90,7 +97,8 @@ def main():
         # create datapoint -- only pos_z, vel_z, acc_z are needed to test the function
         dp = utils.Sim_DataPoint(i, 0, pos_z[i], 0, 0, vel_z[i], 0, acc_z[i], 0)
         # pass to function and record results
-        pressure, altitude = get_mach_dip_pressure_altitude(dp)
+        altitude = get_mach_dip_altitude(dp)
+        pressure = ambiance.Atmosphere(altitude).pressure[0]
         results_altitude.append(altitude)
         results_pressure.append(pressure)
 
@@ -106,4 +114,4 @@ def main():
 
 if __name__ == '__main__':
     from matplotlib import pyplot as plt
-    main()    
+    test()    

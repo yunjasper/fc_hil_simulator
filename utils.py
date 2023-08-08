@@ -49,21 +49,20 @@ class Settings:
     # simulation parameters
     USE_HARDWARE_TARGET = False
     SEND_ALTITUDE_INSTEAD_OF_PRESSURE = False
-    SIMULATE_TRANSONIC_MACH_DIP = False
+    SIMULATE_TRANSONIC_MACH_DIP = True
     USE_NOISY_ALTITUDE = True
 
     ALTITUDE_NOISE_MAX_AMPLITUDE_M = 3
     
-    SIMULATION_TIMESTEP_MS = 10
-    HARDWARE_UPDATE_TIMESTEP_MS = 10 * SIMULATION_TIMESTEP_MS
-    PRINT_UPDATE_TIMESTEP_MS = 10 * SIMULATION_TIMESTEP_MS # frequency of printing to console
+    SIMULATION_TIMESTEP_MS = 1
+    HARDWARE_UPDATE_TIMESTEP_MS = 1 * SIMULATION_TIMESTEP_MS
+    PRINT_UPDATE_TIMESTEP_MS = 1 * SIMULATION_TIMESTEP_MS # frequency of printing to console
     SIMULATION_SW_TARGET_LAUNCH_TIME_MS = 100
     SIMULATION_TIME_ALLOWED_FOR_HW_TO_DETECT_LANDING_MS = 1000 * HARDWARE_UPDATE_TIMESTEP_MS
     SIMULATION_LOG_FILENAME_FORMAT = 'sim_log_' + RKT_THRUST_CURVE_FILE[:-4]
 
     # data saving parameters
     DATA_SAVE_STRIDE_LOG = 10 # stride of data saved to csv file
-    DATA_SAVE_STRIDE_PLOT = 10 # stride of data plotted
 
 
     def format_rocket(self) -> str:
@@ -77,10 +76,10 @@ class Settings:
         """returns string in csv (comma-separated) format of simulation parameters"""
         return ('simulation settings\ntimestep (ms), %.3f\nhardware update timestep (ms), %.3f\nprint update timestep (ms), \
                 %.3f\nuse noisy altitude (boolean), %s\naltitude noise max amplitude (m), \
-                %.3f\nuse hardware target (boolean), %s\nsim sw target launch time (ms), %.3f\nstride data save, %d\nstride data plot, %d\n\n' 
+                %.3f\nuse hardware target (boolean), %s\nsim sw target launch time (ms), %.3f\nstride data save, %d\n\n' 
                 % (self.SIMULATION_TIMESTEP_MS, self.HARDWARE_UPDATE_TIMESTEP_MS, self.PRINT_UPDATE_TIMESTEP_MS, 
                    self.USE_NOISY_ALTITUDE, self.ALTITUDE_NOISE_MAX_AMPLITUDE_M, self.USE_HARDWARE_TARGET, 
-                   self.SIMULATION_SW_TARGET_LAUNCH_TIME_MS, self.DATA_SAVE_STRIDE_LOG, self.DATA_SAVE_STRIDE_PLOT))
+                   self.SIMULATION_SW_TARGET_LAUNCH_TIME_MS, self.DATA_SAVE_STRIDE_LOG))
 
 # used to track states of the simulation
 class FLIGHT_STATES(Enum):

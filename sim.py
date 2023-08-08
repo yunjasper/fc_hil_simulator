@@ -18,6 +18,7 @@ import time
 # "local" project libraries
 import altos_flight_data as aosfd
 import hardware_interface
+import mach_dip
 import rocket
 import utils
 
@@ -150,6 +151,13 @@ class Simulation:
         self.rkt_pos_z += self.rkt_vel_z * self.timestep_ms / 1000
         self.rkt_pos_z_noisy = self.rkt_pos_z + (np.random.rand(1, 1)[0][0] - 0.5) * utils.Settings.ALTITUDE_NOISE_MAX_AMPLITUDE_M
 
+        if utils.Settings.SIMULATE_TRANSONIC_MACH_DIP == True:
+            dp = utils.Sim_DataPoint(self.time, self.rkt_pos_x, self.rkt_pos_z, self.rkt_pos_z_noisy, 
+                                 self.rkt_vel_x, self.rkt_vel_z, self.rkt_acc_x, self.rkt_acc_z, self.rkt_flight_state)
+            altitude = mach_dip.get_mach_dip_altitude(dp)
+            self.rkt_pos_z = altitude
+            self.rkt_pos_z_noisy = self.rkt_pos_z + (np.random.rand(1, 1)[0][0] - 0.5) * utils.Settings.ALTITUDE_NOISE_MAX_AMPLITUDE_M # update with new z position
+
     def log_datapoint(self):
         dp = utils.Sim_DataPoint(self.time, self.rkt_pos_x, self.rkt_pos_z, self.rkt_pos_z_noisy, 
                                  self.rkt_vel_x, self.rkt_vel_z, self.rkt_acc_x, self.rkt_acc_z, self.rkt_flight_state)
@@ -184,7 +192,6 @@ class Simulation:
         f.close()
         filename = self.session_folder + '_DATA.csv'
         f = open(filename, 'w')
-        self.convert_log_to_df(stride=utils.Settings.DATA_SAVE_STRIDE_LOG)
         self.datatable.to_csv(filename, sep=',', columns=self.data_column_names, mode='a', index=False)
         f.close()
         os.chdir(os.pardir)
@@ -206,7 +213,6 @@ class Simulation:
         return state_change_indices
 
     def plot_simulation_results(self):
-        self.convert_log_to_df(stride=utils.Settings.DATA_SAVE_STRIDE_PLOT)
         state_change_indices = self.get_state_changes()
         
         plt.rc('lines', linewidth=2)
@@ -254,8 +260,6 @@ class Simulation:
         # want to know:
         #   - altitude of all state changes
         #   - time + altitude at ejection vs true apogee (shows lead/lag of algorithm)
-        if self.datatable.empty:
-            self.convert_log_to_df(stride=utils.Settings.DATA_SAVE_STRIDE_LOG)
         state_change_indices = self.get_state_changes()
         # get true apogee
         apogee_index = np.argmax(self.datatable['position z (m)'], axis=0)
@@ -416,11 +420,18 @@ def main():
             if sleep_time_ns > 0:
                 time.sleep(sleep_time_ns / 100000000000) # sleep argument is in seconds
     
+        # for debugging only
+        if sim.time > 25000:
+            break
+
     if utils.Settings.USE_HARDWARE_TARGET == True:
         hw.com_port.close()
     
     # final datapoint after exiting simulation
     sim.log_datapoint()
+    
+    # must call convert_log_to_df() before calling analyze, save, and plot!
+    sim.convert_log_to_df(stride=utils.Settings.DATA_SAVE_STRIDE_LOG)
     sim.analyze_sim_results()
     sim.save_sim_log_to_file()
     sim.plot_simulation_results()
