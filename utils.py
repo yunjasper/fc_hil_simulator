@@ -34,10 +34,10 @@ class Settings:
     # RKT_THRUST_CURVE_FILE = 'Cesaroni_14263N3400-P.rse'
 
     # uncomment for test case with no parachutes. trajectory should be a perfect parabola
-    # RKT_DROGUE_DRAG_COEFF = 0
-    # RKT_DROGUE_AREA = 0
-    # RKT_MAIN_DRAG_COEFF = 0
-    # RKT_MAIN_AREA = 0
+    RKT_DROGUE_DRAG_COEFF = 0
+    RKT_DROGUE_AREA = 0
+    RKT_MAIN_DRAG_COEFF = 0
+    RKT_MAIN_AREA = 0
     TEST_EARLY_EJECTION_CATO = False # as of Aug 7, this feature does not fully work -- I think ejection occurs twice
     EJECTION_CATO_ALTITUDE_M = 1000 / 2
     
@@ -47,7 +47,7 @@ class Settings:
     ALTOS_FLIGHT_DATA_TYPES = ['time', 'accel_x', 'accel_y', 'accel_z', 'pressure']
 
     # simulation parameters
-    USE_HARDWARE_TARGET = True
+    USE_HARDWARE_TARGET = False
     SEND_ALTITUDE_INSTEAD_OF_PRESSURE = True
     SIMULATE_TRANSONIC_MACH_DIP = True
     USE_NOISY_ALTITUDE = False
@@ -59,11 +59,22 @@ class Settings:
     PRINT_UPDATE_TIMESTEP_MS = 1 * SIMULATION_TIMESTEP_MS # frequency of printing to console
     SIMULATION_SW_TARGET_LAUNCH_TIME_MS = 100
     SIMULATION_TIME_ALLOWED_FOR_HW_TO_DETECT_LANDING_MS = 1000 * HARDWARE_UPDATE_TIMESTEP_MS
-    SIMULATION_LOG_FILENAME_FORMAT = 'sim_log_' + RKT_THRUST_CURVE_FILE[:-4]
+
+    # sim internal state variables -- update DATA_INDEX if you change anything in this list!
+    data_column_names = ['time (ms)', 'position x (m)', 'position z (m)', 'position z (noisy) (m)', 'velocity x (m/s)', 
+                'velocity z (m/s)', 'acceleration x (m/s2)', 'acceleration z (m/s2)', 'flight state']
 
     # data saving parameters
     DATA_SAVE_STRIDE_LOG = 10 # stride of data saved to csv file
 
+
+    @classmethod
+    def get_log_filename_format(cls) -> str:
+        if cls.USE_HARDWARE_TARGET is True:
+            log_filename = 'sim_log_HW_TARGET_'
+        else:
+            log_filename = 'sim_log_SW_TARGET_'
+        return log_filename
 
     def format_rocket(self) -> str:
         """returns string in csv (comma-separated) format of rocket parameters"""
@@ -91,6 +102,18 @@ class FLIGHT_STATES(Enum):
     LANDED = 5
     LAUNCH_COMMAND_START_SIM = 8
     ERROR = 9
+
+class DATA_INDEX(Enum):
+    # these must be in consecutive ascending order from 0, following data_column_names!
+    TIME = 0
+    POS_X = 1
+    POS_Z = 2
+    POS_Z_NOISY = 3
+    VEL_X = 4
+    VEL_Z = 5
+    ACC_X = 6
+    ACC_Z = 7
+    FLIGHT_STATE = 8
 
 class Sim_DataPoint:
     def __init__(self, time, pos_x, pos_z, pos_z_noisy, vel_x, vel_z, acc_x, acc_z, flight_state):

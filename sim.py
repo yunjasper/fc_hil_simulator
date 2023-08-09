@@ -35,9 +35,6 @@ SERIAL_PORT_TIMEOUT = 5 # seconds
 
 class Simulation:
 
-    data_column_names = ['time (ms)', 'position x (m)', 'position z (m)', 'position z (noisy) (m)', 'velocity x (m/s)', 
-                'velocity z (m/s)', 'acceleration x (m/s2)', 'acceleration z (m/s2)', 'flight state']
-
     def __init__(self) -> None:
         self.time = 0
         self.launch_time = 0
@@ -57,9 +54,9 @@ class Simulation:
         self.rkt_flight_state = utils.FLIGHT_STATES.PAD
 
         self.datalog = [] # list of utils.Sim_DataPoint objects
-        self.datatable = pd.DataFrame(columns=self.data_column_names) # empty, to be filled in after sim ends
+        self.datatable = pd.DataFrame(columns=utils.Settings.data_column_names) # empty, to be filled in after sim ends
         
-        base_filename = utils.Settings.SIMULATION_LOG_FILENAME_FORMAT + time.strftime('%Y-%m-%d_%H-%M-%S')
+        base_filename = utils.Settings.get_log_filename_format() + time.strftime('%Y-%m-%d_%H-%M-%S')
         self.session_folder = base_filename # folder name where outputs will be saved
         os.mkdir(self.session_folder)
         
@@ -167,7 +164,7 @@ class Simulation:
         print('Converting simulation session data...')
         conversion_progress_percent = 0
 
-        datatable = pd.DataFrame(columns=self.data_column_names) # empty, to be filled in
+        datatable = pd.DataFrame(columns=utils.Settings.data_column_names) # empty, to be filled in
         indices = np.arange(len(self.datalog), step=stride)
         for i in range(len(indices)):
             idx = indices[i]
@@ -192,13 +189,13 @@ class Simulation:
         f.close()
         filename = self.session_folder + '_DATA.csv'
         f = open(filename, 'w')
-        self.datatable.to_csv(filename, sep=',', columns=self.data_column_names, mode='a', index=False)
+        self.datatable.to_csv(filename, sep=',', columns=utils.Settings.data_column_names, mode='a', index=False)
         f.close()
         os.chdir(os.pardir)
 
     def get_state_changes(self):
         # find state change time indices
-        states = self.datatable['flight state']
+        states = self.datatable.iloc[:, utils.DATA_INDEX.FLIGHT_STATE.value]
         state_change_indices = []
         previous_state = utils.FLIGHT_STATES.PAD.name
         for i in range(len(states)):
@@ -220,31 +217,27 @@ class Simulation:
         plt.rc('grid', linestyle='--')
 
         figX, axX = plt.subplots(3, 1)
-        time_values_s = self.datatable['time (ms)'] / 1000
-        axX[0].plot(time_values_s, self.datatable['position x (m)'])
+        time_values_s = self.datatable.iloc[:, utils.DATA_INDEX.TIME.value] / 1000
+        axX[0].plot(time_values_s, self.datatable.iloc[:, utils.DATA_INDEX.POS_X.value])
         for idx in state_change_indices:
             axX[0].axvline(time_values_s[idx], color='red')
-        # if self.datalog[-1].rkt_flight_state == utils.FLIGHT_STATES.LANDED:
-        #     axX[0].axvline(time_values_s[len(time_values_s) - 1], color='red')
         axX[0].set_ylabel('position x (m)')
-        axX[1].plot(time_values_s, self.datatable['velocity x (m/s)'])
+        axX[1].plot(time_values_s, self.datatable.iloc[:, utils.DATA_INDEX.VEL_X.value])
         axX[1].set_ylabel('velocity x (m/s)')
-        axX[2].plot(time_values_s, self.datatable['acceleration x (m/s2)'])
+        axX[2].plot(time_values_s, self.datatable.iloc[:, utils.DATA_INDEX.ACC_X.value])
         axX[2].set_ylabel('acceleration x (m/s2)')
         axX[2].set_xlabel('time (s)')
 
         figZ, axZ = plt.subplots(3, 1)
-        axZ[0].plot(time_values_s, self.datatable['position z (noisy) (m)'])
-        axZ[0].plot(time_values_s, self.datatable['position z (m)'])
+        axZ[0].plot(time_values_s, self.datatable.iloc[:, utils.DATA_INDEX.POS_Z_NOISY.value])
+        axZ[0].plot(time_values_s, self.datatable.iloc[:, utils.DATA_INDEX.POS_Z.value])
         axZ[0].legend(['noisy', 'true'])
         for idx in state_change_indices:
             axZ[0].axvline(time_values_s[idx], color='red')
-        # if self.datalog[-1].rkt_flight_state == utils.FLIGHT_STATES.LANDED:
-        #     axZ[0].axvline(time_values_s[len(time_values_s) - 1], color='red')
         axZ[0].set_ylabel('position z (m)')
-        axZ[1].plot(time_values_s, self.datatable['velocity z (m/s)'])
+        axZ[1].plot(time_values_s, self.datatable.iloc[:, utils.DATA_INDEX.VEL_Z.value])
         axZ[1].set_ylabel('velocity z (m/s)')
-        axZ[2].plot(time_values_s, self.datatable['acceleration z (m/s2)'])
+        axZ[2].plot(time_values_s, self.datatable.iloc[:, utils.DATA_INDEX.ACC_Z.value])
         axZ[2].set_ylabel('acceleration z (m/s2)')
         axZ[2].set_xlabel('time (s)')
 
@@ -262,18 +255,18 @@ class Simulation:
         #   - time + altitude at ejection vs true apogee (shows lead/lag of algorithm)
         state_change_indices = self.get_state_changes()
         # get true apogee
-        apogee_index = np.argmax(self.datatable['position z (m)'], axis=0)
-        altitude_apogee = self.datatable['position z (m)'][apogee_index]
-        time_apogee = self.datatable['time (ms)'][apogee_index]
+        apogee_index = np.argmax(self.datatable.iloc[:, utils.DATA_INDEX.POS_Z.value], axis=0)
+        altitude_apogee = self.datatable.iloc[apogee_index, utils.DATA_INDEX.POS_Z.value]
+        time_apogee = self.datatable.iloc[apogee_index, utils.DATA_INDEX.TIME.value]
 
         # get ejection stats
         ej_idx = 0
         for idx in state_change_indices:
-            if self.datatable['flight state'][idx] == utils.FLIGHT_STATES.DROGUE_DESCENT.name:
+            if self.datatable.iloc[idx, utils.DATA_INDEX.FLIGHT_STATE.value] == utils.FLIGHT_STATES.DROGUE_DESCENT.name:
                 ej_idx = idx
                 break
-        altitude_ej = self.datatable['position z (m)'][ej_idx]
-        time_ej = self.datatable['time (ms)'][ej_idx]
+        altitude_ej = self.datatable.iloc[ej_idx, utils.DATA_INDEX.POS_Z.value]
+        time_ej = self.datatable.iloc[ej_idx, utils.DATA_INDEX.TIME.value]
         
         os.chdir(self.session_folder)
         with open(self.session_folder + '_analysis.txt', 'w') as f:    
