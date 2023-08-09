@@ -299,7 +299,8 @@ class Simulation:
             
             time_final = self.datatable['time (ms)'][len(self.datatable) - 1]
             altitude_final = self.datatable['position z (m)'][len(self.datatable) - 1]
-            final_str =  'Final state:\ttime (ms) = %.3f\taltitude (m) = %.3f' % (time_final, altitude_final)
+            state_final = self.datatable['flight state'][len(self.datatable) - 1]
+            final_str =  'Final state:\ttime (ms) = %.3f\taltitude (m) = %.3f\tstate = %s' % (time_final, altitude_final, state_final)
             print(apogee_str)
             print(ej_str)
             print(diff_str)
@@ -362,6 +363,8 @@ def main():
         
         # select which data source to use: sim engine or altus metrum flight data
         if utils.Settings.USE_ALTOS_FLIGHT_DATA == True and afd.data_index_last_accessed <= afd.apogee_index:
+            if sim.launched == False:
+                sim.launch_time = sim.time
             data = afd.get_datapoint(sim.time - sim.launch_time)
             # TODO: determine how to automatically update simulation variables
             sim.rkt_acc_x = data.get('accel_x')
