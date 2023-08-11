@@ -30,7 +30,7 @@ import utils
 
 # for now, hardcode the port. todo: make flexible 
 SERIAL_PORT = 'COM7'
-BAUD_RATE = 115200
+BAUD_RATE = 1152000
 SERIAL_PORT_TIMEOUT = 5 # seconds
 
 class Simulation:
@@ -108,6 +108,10 @@ class Simulation:
             air_mass_density = ambiance.Atmosphere(self.rkt_pos_z).density[0]
             force_drogue = rkt.drogue_drag_coeff * air_mass_density * (self.rkt_vel_z ** 2) * rkt.drogue_area_m2 / 2
             force_z = thrust + (-1 * np.sign(self.rkt_vel_z) * force_drogue) - rocket_weight
+
+            # rocket hits the ground
+            if self.rkt_pos_z <= utils.Settings.GROUND_ALTITUDE_M:
+                force_z = 0
         
         elif self.sim_flight_state == utils.FLIGHT_STATES.MAIN_DESCENT:
             force_x = 0
@@ -394,7 +398,7 @@ def main():
                         sim.sim_landed = True
                         sim.sim_landed_time = sim.time
                     if sim.time - sim.sim_landed_time > utils.Settings.SIMULATION_TIME_ALLOWED_FOR_HW_TO_DETECT_LANDING_MS:
-                        print('Hardware failed to detect landing within allowed simulation. Terminating simulation.')
+                        print('Target device under test failed to detect landing within allowed simulation time. Terminating simulation.')
                         break
             
             # test simulation behavior with CATO due to early ejection (only testable with software mock FC)
@@ -416,9 +420,9 @@ def main():
         # sleep time :)
         end_time_ns = time.time_ns()
         sleep_time_ns = sim.timestep_ms * 1000000 - (end_time_ns - start_time_ns)
-        if utils.Settings.USE_HARDWARE_TARGET:
-            if sleep_time_ns > 0:
-                time.sleep(sleep_time_ns / 100000000000) # sleep argument is in seconds
+        # if utils.Settings.USE_HARDWARE_TARGET:
+            # if sleep_time_ns > 0:
+            #     time.sleep(sleep_time_ns / 100000000000) # sleep argument is in seconds
     
         # for debugging only
         # if sim.time > 25000:
