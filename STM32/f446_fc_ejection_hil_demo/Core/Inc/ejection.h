@@ -14,7 +14,7 @@
 #include "stdint.h"
 #include "hil_sim_interface.h"
 
-#define EJ_ALGO_UPDATE_RATE_HZ		400
+#define EJ_ALGO_UPDATE_RATE_HZ		100
 
 // ejection algo defines
 

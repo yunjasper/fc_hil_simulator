@@ -28,6 +28,9 @@ class Hardware_Interface:
     CONTROL_RESPONSE_PACKET_LENGTH = 7 # 'C,x,E\r\n'
     LAUNCH_COMMAND_PACKET = 'launch\n' # hw should send this to the sim to indicate launched
 
+    POLL_DATA_PACKET = 'pollda\n'
+    POLL_DATA_PACKET_LENGTH = 7
+
     def __init__(self, com_port : serial.Serial, flight_state : utils.FLIGHT_STATES, use_hw_target) -> None:
         self.com_port = com_port
         self.flight_state = flight_state
@@ -57,6 +60,20 @@ class Hardware_Interface:
             self.com_port.write(data_packet)
         else:
             self.mock_fc.update_sim_step(data_packet)
+    
+    def wait_for_poll(self):
+        if utils.Settings.USE_HARDWARE_TARGET:
+            while self.com_port.in_waiting == 0:
+                pass
+            while self.com_port.in_waiting >= Hardware_Interface.POLL_DATA_PACKET_LENGTH:
+                packet = self.com_port.read(Hardware_Interface.POLL_DATA_PACKET_LENGTH).decode('utf-8')
+                # print('Packet: ' + packet)
+                if packet == self.POLL_DATA_PACKET:
+                    return
+                else:
+                    pass # do nothing and just keep waiting
+        else:
+            return
             
     def parse_control_response(self, response):
         # verify that packet follows expected structure
@@ -79,7 +96,7 @@ class Hardware_Interface:
                 pass
             while self.com_port.in_waiting >= Hardware_Interface.CONTROL_RESPONSE_PACKET_LENGTH:
                 control_response = self.com_port.read(Hardware_Interface.CONTROL_RESPONSE_PACKET_LENGTH).decode('utf-8')
-                print('Control response: ' + control_response)
+                # print('Control response: ' + control_response)
                 flight_state = self.parse_control_response(control_response)
                 if flight_state == utils.FLIGHT_STATES.LAUNCH_COMMAND_START_SIM: 
                     return flight_state

@@ -42,12 +42,12 @@ class Settings:
     EJECTION_CATO_ALTITUDE_M = 1000 / 2
     
     # Altus Metrum (AltOS) flight data usage configuration
-    USE_ALTOS_FLIGHT_DATA = True
+    USE_ALTOS_FLIGHT_DATA = False
     ALTOS_FLIGHT_DATA_FILENAME = 'flight_data/2020-10-10-serial-2378-flight-0021.csv'
     ALTOS_FLIGHT_DATA_TYPES = ['time', 'accel_x', 'accel_y', 'accel_z', 'pressure']
 
     # simulation parameters
-    USE_HARDWARE_TARGET = False
+    USE_HARDWARE_TARGET = True
     SEND_ALTITUDE_INSTEAD_OF_PRESSURE = True
     SIMULATE_TRANSONIC_MACH_DIP = True
     USE_NOISY_ALTITUDE = False

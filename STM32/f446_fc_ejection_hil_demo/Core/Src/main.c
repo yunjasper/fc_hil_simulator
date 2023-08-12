@@ -71,20 +71,20 @@ void config_timer_freq(TIM_TypeDef *TIMx, uint32_t freq) {
 	}
 
 	TIMx->PSC = psc;
-	TIMx->ARR = (uint16_t) (45000000 / ((psc + 1) * freq) - 1);
+	TIMx->ARR = (uint16_t) (90000000 / ((psc + 1) * freq) - 1);
 	TIMx->EGR |= 0x1; // force update
 }
 
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	if (huart == &huart3) {
-		// HIL interface should run in the background, invisible to the app.
-		// processing is fast, so just complete it all in the ISR
-		HAL_GPIO_WritePin(ARD_D7_GPIO_Port, ARD_D7_Pin, GPIO_PIN_SET);
-		hil_if_parse_telemetry();
-		HAL_GPIO_WritePin(ARD_D7_GPIO_Port, ARD_D7_Pin, GPIO_PIN_RESET);
-	}
-}
+//void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+//	if (huart == &huart3) {
+//		// HIL interface should run in the background, invisible to the app.
+//		// processing is fast, so just complete it all in the ISR
+//		HAL_GPIO_WritePin(ARD_D7_GPIO_Port, ARD_D7_Pin, GPIO_PIN_SET);
+//		hil_if_parse_telemetry();
+//		HAL_GPIO_WritePin(ARD_D7_GPIO_Port, ARD_D7_Pin, GPIO_PIN_RESET);
+//	}
+//}
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	if (GPIO_Pin == USER_Btn_Pin) {
@@ -174,6 +174,9 @@ int main(void)
 	  if (timer_elapsed) { // mimics FC running the main loop on timer interrupt
 		  HAL_GPIO_WritePin(ARD_D0_GPIO_Port, ARD_D0_Pin, GPIO_PIN_SET); // entire block takes 650 us to run. limited by uart probably
 
+		  HAL_GPIO_WritePin(ARD_D7_GPIO_Port, ARD_D7_Pin, GPIO_PIN_SET);
+		  hil_if_poll_simulator();
+		  HAL_GPIO_WritePin(ARD_D7_GPIO_Port, ARD_D7_Pin, GPIO_PIN_RESET);
 		  ej_update_flight_state(&fs);
 		  hil_if_send_flight_state(&fs);
 		  timer_elapsed = 0;

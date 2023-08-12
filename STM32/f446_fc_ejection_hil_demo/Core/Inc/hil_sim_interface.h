@@ -22,6 +22,9 @@
 
 #define LAUNCHED_RESPONSE			((uint8_t *)"launch\n")
 
+#define POLL_MESSAGE				((uint8_t *)"pollda\n")
+#define POLL_MESSAGE_LENGTH			7
+
 #define RX_TELEMETRY_HEADER			((uint32_t) 0xFFFF0000)
 #define RX_TELEMETRY_TRAILER		((uint32_t) 0x0000FFFF)
 
@@ -57,6 +60,7 @@ typedef struct {
 void hil_if_init(void);
 void hil_if_parse_telemetry();
 void hil_if_send_flight_state(flight_state_t *fs);
+void hil_if_poll_simulator(void);
 
 // getters to access data
 void hil_if_get_current_data(hil_data_packet_t *data);

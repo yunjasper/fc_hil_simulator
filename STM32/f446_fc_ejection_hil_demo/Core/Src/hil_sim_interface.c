@@ -33,7 +33,7 @@ void hil_if_init(void) {
 	current_data.altitude_m = 0;
 
 	// start wait for data from sim engine
-	hil_if_start_rx_dma();
+//	hil_if_start_rx_dma();
 }
 
 void hil_if_parse_telemetry() {
@@ -48,7 +48,7 @@ void hil_if_parse_telemetry() {
 		memcpy(&current_data, rx_dma_buffer, RX_TELEMETRY_LENGTH);
 		memset(rx_dma_buffer, 0, RX_TELEMETRY_LENGTH);
 	}
-	hil_if_start_rx_dma();
+//	hil_if_start_rx_dma();
 }
 
 // sends the current hardware target flight state to the sim engine
@@ -68,6 +68,16 @@ void hil_if_send_flight_state(flight_state_t *fs) {
 // can customize these getters to match the format of data received by the
 // target hardware platform, e.g. combine all acceleration values in array
 // -----------------------------------------------------------------------
+
+void hil_if_poll_simulator(void) {
+	// note: these UART calls block until complete
+	// request data
+	HAL_UART_Transmit(&HIL_IF_UART, POLL_MESSAGE, POLL_MESSAGE_LENGTH, HIL_UART_TIMEOUT);
+	// wait until receiving telemetry
+	HAL_UART_Receive(&HIL_IF_UART, rx_dma_buffer, RX_TELEMETRY_LENGTH, HIL_UART_TIMEOUT);
+	// parse
+	hil_if_parse_telemetry();
+}
 
 // grab entire packet if desired
 void hil_if_get_current_data(hil_data_packet_t *data) {
