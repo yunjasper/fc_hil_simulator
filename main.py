@@ -88,7 +88,7 @@ def main():
         
         if (s.time % utils.Settings.HARDWARE_UPDATE_TIMESTEP_MS == 0):
             # send data to controller
-            hw.wait_for_poll()
+            # hw.wait_for_poll()
             hw.send(s.datalog[-1])
             hw_flight_state = hw.read_hw_state()
             if utils.Settings.USE_HARDWARE_TARGET == False:
