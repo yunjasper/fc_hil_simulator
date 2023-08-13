@@ -32,11 +32,14 @@ class Simulation:
         self.sim_landed = False # sim may land before hardware detects it
         self.sim_landed_time = 0
         self.sim_flight_state = utils.FLIGHT_STATES.PAD
-        
+        self.ground_altitude = utils.Settings.GROUND_ALTITUDE_M
+        self.simulate_mach_dip = utils.Settings.SIMULATE_TRANSONIC_MACH_DIP
+        self.altitude_noise_amplitude = utils.Settings.ALTITUDE_NOISE_MAX_AMPLITUDE_M
+
         # rocket states
         self.rkt_pos_x = 0
-        self.rkt_pos_z = utils.Settings.GROUND_ALTITUDE_M
-        self.rkt_pos_z_noisy = utils.Settings.GROUND_ALTITUDE_M
+        self.rkt_pos_z = self.ground_altitude
+        self.rkt_pos_z_noisy = self.ground_altitude
         self.rkt_vel_x = 0
         self.rkt_vel_z = 0
         self.rkt_acc_x = 0
@@ -100,7 +103,7 @@ class Simulation:
             force_z = thrust + (-1 * np.sign(self.rkt_vel_z) * force_drogue) - rocket_weight
 
             # rocket hits the ground
-            if self.rkt_pos_z <= utils.Settings.GROUND_ALTITUDE_M:
+            if self.rkt_pos_z <= self.ground_altitude:
                 force_z = 0
         
         elif self.sim_flight_state == utils.FLIGHT_STATES.MAIN_DESCENT:
@@ -113,7 +116,7 @@ class Simulation:
             force_z = thrust + (-1 * np.sign(self.rkt_vel_z) * force_main) - rocket_weight
         
             # rocket hits the ground
-            if self.rkt_pos_z <= utils.Settings.GROUND_ALTITUDE_M:
+            if self.rkt_pos_z <= self.ground_altitude:
                 force_z = 0
         
         elif self.sim_flight_state == utils.FLIGHT_STATES.LANDED:
@@ -124,7 +127,7 @@ class Simulation:
         self.update_kinematics(rkt, force_x, force_z)
 
     def update_kinematics(self, rocket : rocket.Rocket, force_x, force_z):
-        if force_z <= 0 and self.rkt_pos_z <= utils.Settings.GROUND_ALTITUDE_M:
+        if force_z <= 0 and self.rkt_pos_z <= self.ground_altitude:
             # cannot go below ground so rocket is not moving
             self.rkt_acc_z = 0
             self.rkt_acc_x = 0
@@ -142,7 +145,7 @@ class Simulation:
         self.rkt_pos_z += self.rkt_vel_z * self.timestep_ms / 1000
         self.rkt_pos_z_noisy = self.rkt_pos_z + (np.random.rand(1, 1)[0][0] - 0.5) * utils.Settings.ALTITUDE_NOISE_MAX_AMPLITUDE_M
 
-        if utils.Settings.SIMULATE_TRANSONIC_MACH_DIP == True:
+        if self.simulate_mach_dip == True:
             dp = utils.Sim_DataPoint(self.time, self.rkt_pos_x, self.rkt_pos_z, self.rkt_pos_z_noisy, 
                                  self.rkt_vel_x, self.rkt_vel_z, self.rkt_acc_x, self.rkt_acc_z, self.rkt_flight_state)
             altitude = mach_dip.get_mach_dip_altitude(dp)

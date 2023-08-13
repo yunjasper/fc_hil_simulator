@@ -33,7 +33,7 @@ void hil_if_init(void) {
 	current_data.altitude_m = 0;
 
 	// start wait for data from sim engine
-//	hil_if_start_rx_dma();
+	hil_if_start_rx_dma();
 }
 
 void hil_if_parse_telemetry() {
@@ -48,7 +48,7 @@ void hil_if_parse_telemetry() {
 		memcpy(&current_data, rx_dma_buffer, RX_TELEMETRY_LENGTH);
 		memset(rx_dma_buffer, 0, RX_TELEMETRY_LENGTH);
 	}
-//	hil_if_start_rx_dma();
+	hil_if_start_rx_dma();
 }
 
 // sends the current hardware target flight state to the sim engine

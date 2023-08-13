@@ -31,23 +31,30 @@ class Hardware_Interface:
     POLL_DATA_PACKET = 'pollda\n'
     POLL_DATA_PACKET_LENGTH = 7
 
-    def __init__(self, com_port : serial.Serial, flight_state : utils.FLIGHT_STATES, use_hw_target) -> None:
+    def __init__(
+            self, com_port : serial.Serial, 
+            flight_state : utils.FLIGHT_STATES, 
+            use_hw_target, 
+            use_noisy_altitude=utils.Settings.USE_NOISY_ALTITUDE,
+            send_alt_instead_of_pressure=utils.Settings.SEND_ALTITUDE_INSTEAD_OF_PRESSURE,) -> None:
         self.com_port = com_port
         self.flight_state = flight_state
         self.use_target_hw = use_hw_target
+        self.use_noisy_altitude = use_noisy_altitude
+        self.send_alt_instead_of_pressure = send_alt_instead_of_pressure
         self.mock_fc = None
 
         if use_hw_target == False:
             self.mock_fc = fc.Flight_Computer()
 
     def send(self, data : utils.Sim_DataPoint):
-        if utils.Settings.USE_NOISY_ALTITUDE:
+        if self.use_noisy_altitude:
             altitude = data.rkt_pos_z_noisy
         else:
             altitude = data.rkt_pos_z
         pressure = altitude2pressure_hPa(altitude)
         
-        if utils.Settings.SEND_ALTITUDE_INSTEAD_OF_PRESSURE == True:
+        if self.send_alt_instead_of_pressure == True:
             baro_data = altitude
         else:
             baro_data = pressure
@@ -62,7 +69,7 @@ class Hardware_Interface:
             self.mock_fc.update_sim_step(data_packet)
     
     def wait_for_poll(self):
-        if utils.Settings.USE_HARDWARE_TARGET:
+        if self.use_target_hw:
             while self.com_port.in_waiting == 0:
                 pass
             while self.com_port.in_waiting >= Hardware_Interface.POLL_DATA_PACKET_LENGTH:
