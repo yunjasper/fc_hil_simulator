@@ -206,7 +206,7 @@ class Simulation:
 
         return state_change_indices
 
-    def plot_simulation_results(self):
+    def plot_simulation_results(self, show_plots=True):
         state_change_indices = self.get_state_changes()
         
         plt.rc('lines', linewidth=2)
@@ -244,7 +244,8 @@ class Simulation:
         figX.savefig(self.session_folder + '_x_axis_plots.png', dpi=300)
         figZ.savefig(self.session_folder + '_z_axis_plots.png', dpi=300)
         os.chdir(os.pardir)
-        plt.show()
+        if show_plots:
+            plt.show()
 
     def analyze_sim_results(self):
         # want to know:

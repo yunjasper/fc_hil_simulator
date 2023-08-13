@@ -45,7 +45,7 @@ class Hardware_Interface:
         self.mock_fc = None
 
         if use_hw_target == False:
-            self.mock_fc = fc.Flight_Computer()
+            self.mock_fc = fc.Flight_Computer(self.send_alt_instead_of_pressure)
 
     def send(self, data : utils.Sim_DataPoint):
         if self.use_noisy_altitude:

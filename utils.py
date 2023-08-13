@@ -34,10 +34,10 @@ class Settings:
     # RKT_THRUST_CURVE_FILE = 'Cesaroni_14263N3400-P.rse'
 
     # uncomment for test case with no parachutes. trajectory should be a perfect parabola
-    RKT_DROGUE_DRAG_COEFF = 0
-    RKT_DROGUE_AREA = 0
-    RKT_MAIN_DRAG_COEFF = 0
-    RKT_MAIN_AREA = 0
+    # RKT_DROGUE_DRAG_COEFF = 0
+    # RKT_DROGUE_AREA = 0
+    # RKT_MAIN_DRAG_COEFF = 0
+    # RKT_MAIN_AREA = 0
     TEST_EARLY_EJECTION_CATO = False # as of Aug 7, this feature does not fully work -- I think ejection occurs twice
     EJECTION_CATO_ALTITUDE_M = 1000 / 2
     
@@ -47,7 +47,7 @@ class Settings:
     ALTOS_FLIGHT_DATA_TYPES = ['time', 'accel_x', 'accel_y', 'accel_z', 'pressure']
 
     # simulation parameters
-    USE_HARDWARE_TARGET = True
+    USE_HARDWARE_TARGET = False
     SEND_ALTITUDE_INSTEAD_OF_PRESSURE = True
     SIMULATE_TRANSONIC_MACH_DIP = True
     USE_NOISY_ALTITUDE = False

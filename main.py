@@ -30,7 +30,7 @@ def open_COM_port() -> serial.Serial:
     try: 
         ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=SERIAL_PORT_TIMEOUT)
     except serial.SerialException:
-        print('Cannot open requested port. Quitting program.')
+        print('Cannot open requested port.')
         ser = None
     return ser
 
@@ -41,12 +41,12 @@ def setup_sim(values, window):
     s = sim.Simulation()
     
 
-def save_sim_results(sim):
+def save_sim_results(sim, show_plots):
     # must call convert_log_to_df() before calling analyze, save, and plot!
     sim.convert_log_to_df(stride=utils.Settings.DATA_SAVE_STRIDE_LOG)
     sim.analyze_sim_results()
     sim.save_sim_log_to_file()
-    sim.plot_simulation_results()
+    sim.plot_simulation_results(show_plots)
 
 
 def main():
@@ -62,6 +62,7 @@ def main():
     print_timestep = utils.Settings.PRINT_UPDATE_TIMESTEP_MS
     sw_sim_launch_time = utils.Settings.SIMULATION_SW_TARGET_LAUNCH_TIME_MS
     hw_landing_detect_time = utils.Settings.SIMULATION_TIME_ALLOWED_FOR_HW_TO_DETECT_LANDING_MS
+    gui.set_sim_running_status(gui.window, 'Stopped')
 
     # open gui and wait for start button to be pressed
     if utils.Settings.USE_GUI:
@@ -70,6 +71,16 @@ def main():
             gui.update_gui(event, values, gui.window)
             if event == 'button_start_sim':
                 # need to setup simulation to start running
+                target_is_hw = gui.get_sim_target(values, gui.window)
+                if target_is_hw:
+                    ser = open_COM_port()
+                    if ser is None:
+                        continue # do not start simulation
+                    else:
+                        ser.reset_input_buffer()
+                else:
+                    ser = None
+                
                 rkt = gui.get_rocket_options(values, gui.window)
                 rkt.assign_thrust_curve(utils.Settings.RKT_THRUST_CURVE_FILE)
 
@@ -85,25 +96,21 @@ def main():
                 print_timestep = gui.get_print_timestep(values, gui.window)
                 hw_landing_detect_time = gui.get_hw_landing_detect_time(values, gui.window)
 
-                target_is_hw = gui.get_sim_target(values, gui.window)
-                if target_is_hw:
-                    ser = open_COM_port()
-                    ser.reset_input_buffer()
-                else:
-                    ser = None
-
                 use_altos_flight_data = gui.get_altos_fd_option(values, gui.window)
 
                 use_noisy_altitude = gui.get_noisy_altitude_option(values, gui.window)
                 hw = hardware_interface.Hardware_Interface(ser, s.sim_flight_state, use_hw_target=target_is_hw, 
                                                            use_noisy_altitude=use_noisy_altitude, 
                                                            send_alt_instead_of_pressure=send_alt_pressure)
+                
+                # ready to run!
                 break
             elif event == sg.WIN_CLOSED or event == 'Exit':
                 exit()
     
     else: # do not use GUI
         # simulation setup
+        gui.window.close()
         rkt = rocket.Rocket(
             utils.Settings.RKT_MASS_KG,
             utils.Settings.RKT_DROGUE_DRAG_COEFF,
@@ -129,20 +136,19 @@ def main():
             afd = aosfd.AltOS_Flight_Data(filename=utils.Settings.ALTOS_FLIGHT_DATA_FILENAME, 
                                         requested_column_names=utils.Settings.ALTOS_FLIGHT_DATA_TYPES)
 
-
-    # start simulation
     # start simulation
     # log initial conditions as a datapoint
     s.log_datapoint()
     while s.rkt_flight_state != utils.FLIGHT_STATES.LANDED:
         # check GUI for events
-        event, values = gui.window.read(timeout=1)
-        if event == sg.WIN_CLOSED or event == 'Exit':
-            save_sim_results(s)
-            exit() # kill app
-        gui.update_gui(event, values, gui.window)
-        if gui.sim_is_running is False:
-            break
+        if utils.Settings.USE_GUI:
+            event, values = gui.window.read(timeout=1)
+            if event == sg.WIN_CLOSED or event == 'Exit':
+                save_sim_results(s, show_plots=False)
+                exit() # kill app
+            gui.update_gui(event, values, gui.window)
+            if gui.sim_is_running is False:
+                break
         
         start_time_ns = time.time_ns()
         
@@ -202,9 +208,11 @@ def main():
         if (s.time % print_timestep == 0):
             # print('t = %d ms\tpos z = %.3f m\tsim state = %d\trkt state = %d' % (s.time, s.rkt_pos_z, s.sim_flight_state.value, s.rkt_flight_state.value))
             print(s.datalog[-1].format_z() + ', simState = ' + str(s.sim_flight_state.value))
+            gui.update_figure(s.datalog[-1])
 
         s.log_datapoint()
         s.increment_tick()
+        gui.update_sim_results(gui.window, s.datalog[-1], s.sim_flight_state)
         
         # sleep time :)
         # end_time_ns = time.time_ns()
@@ -219,13 +227,17 @@ def main():
 
     if target_is_hw == True:
         hw.com_port.close()
+    gui.set_sim_running_status(gui.window, 'Stopped')
     
     # final datapoint after exiting simulation
     s.log_datapoint()
-    save_sim_results(s)
+    save_sim_results(s, show_plots=True)
     
 
 if __name__ == '__main__':
-    while True:
+    if utils.Settings.USE_GUI:
+        while True:
+            main()
+    else:
         main()
     

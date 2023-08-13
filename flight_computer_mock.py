@@ -14,13 +14,14 @@ import utils
 
 
 class Flight_Computer:
-    def __init__(self) -> None:
+    def __init__(self, send_altitude_instead_of_pressure=utils.Settings.SEND_ALTITUDE_INSTEAD_OF_PRESSURE) -> None:
         self.accX = 0
         self.accY = 0
         self.accZ = 0
         self.altitude = 0
         self.flight_state = utils.FLIGHT_STATES.PAD # TODO: fix sim setup so that we can start from PAD
         self.ground_altitude = utils.Settings.GROUND_ALTITUDE_M # cheating but whatever
+        self.send_altitude_instead_of_pressure = send_altitude_instead_of_pressure
 
         # variables for the ejection algorithm
         self.EJ_MAIN_DEPLOYMENT = 1500 * 0.3048 # ft to m conversion
@@ -57,7 +58,7 @@ class Flight_Computer:
         if header != utils.Settings.PACKET_HEADER or trailer != utils.Settings.PACKET_TRAILER:
             print('Error: FC Mock - could not parse telemetry')
         else:
-            if utils.Settings.SEND_ALTITUDE_INSTEAD_OF_PRESSURE == False:
+            if self.send_altitude_instead_of_pressure == False:
                 # 'altitude' contains pressure (hPa) data, convert to altitude (m)
                 altitude = ambiance.Atmosphere.from_pressure(altitude * 100).h[0]
             
